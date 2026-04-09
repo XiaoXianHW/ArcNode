@@ -1,0 +1,23 @@
+[package]
+name = "app"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "arcowo"
+path = "src/main.rs"
+
+[dependencies]
+core = { path = "../core" }
+watcher-window = { path = "../watcher-window" }
+watcher-idle = { path = "../watcher-idle" }
+watcher-process = { path = "../watcher-process" }
+watcher-shortcut = { path = "../watcher-shortcut" }
+
+anyhow = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+ctrlc = { workspace = true }
+clap = { workspace = true }
+chrono = { workspace = true }
+toml = { workspace = true }
