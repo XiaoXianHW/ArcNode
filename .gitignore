@@ -1,0 +1,25 @@
+# Rust build
+/target
+Cargo.lock
+**/*.rs.bk
+
+# Data
+/data
+*.db
+*.sqlite
+
+# Config
+config.toml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

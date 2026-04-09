@@ -1,0 +1,13 @@
+[package]
+name = "watcher-process"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+core = { path = "../core" }
+anyhow = { workspace = true }
+log = { workspace = true }
+sysinfo = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true }

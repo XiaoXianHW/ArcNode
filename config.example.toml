@@ -1,0 +1,38 @@
+# ArcLM Node Agent Configuration
+
+[device]
+# 设备唯一标识（自动生成UUID格式，无需手动修改）
+id = "auto-generated-uuid"
+# 设备名称（自动获取系统主机名，无需手动修改）
+name = "auto-detected-hostname"
+
+# 空闲监控配置
+[idle]
+# 空闲阈值（秒），超过此时间无操作被认为是空闲状态
+threshold_seconds = 300
+# 检查间隔（秒），多久检查一次空闲状态
+check_interval_seconds = 10
+
+# 监控模块启用配置
+[modules]
+# 启用窗口监控（记录窗口切换）
+window = true
+# 启用进程监控（记录进程启动和退出）
+process = true
+# 启用空闲监控（记录用户空闲状态）
+idle = true
+# 启用快捷键监控（记录键盘快捷键）
+shortcut = true
+
+# 本地存储配置（默认）
+[storage]
+type = "local"
+data_dir = "data"
+
+# 远程网关存储配置（可选）
+# [storage]
+# type = "remote"
+# gateway_url = "http://localhost:8080"
+# token = "your-gateway-token-here"
+# batch_size = 50
+# flush_interval_secs = 3

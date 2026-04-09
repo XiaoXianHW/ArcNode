@@ -1,0 +1,16 @@
+[package]
+name = "watcher-idle"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+core = { path = "../core" }
+anyhow = { workspace = true }
+log = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+x11 = { version = "2.21", features = ["xlib", "xss"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.9"
+core-graphics = "0.23"
