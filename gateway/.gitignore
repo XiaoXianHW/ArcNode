@@ -1,0 +1,6 @@
+gateway
+gateway.db
+gateway.db-*
+config.toml
+web/dist/*
+!web/dist/.gitkeep

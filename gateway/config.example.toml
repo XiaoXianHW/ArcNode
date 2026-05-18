@@ -1,0 +1,48 @@
+# ArcNode Gateway 配置
+
+listen = ":8080"
+token = "change-me-to-a-secure-token"
+db_path = "./gateway.db"
+
+# 时间线分段合并阈值（秒），相邻事件间隔小于此值视为同一段
+segment_gap_seconds = 60
+
+# 分类规则（关键字匹配 process_name + window_title，大小写不敏感）
+[categories]
+coding = [
+    "code", "vscode", "cursor", "zed", "sublime", "atom", "xcode",
+    "intellij", "idea", "pycharm", "goland", "webstorm", "rubymine", "clion", "rider", "phpstorm",
+    "vim", "nvim", "emacs", "helix",
+    "terminal", "iterm", "wezterm", "alacritty", "kitty", "tabby", "warp",
+    "github", "gitlab", "gitkraken", "sourcetree",
+    "android studio", "devstudio", "fleet"
+]
+gaming = [
+    "steam", "epic games", "epicgames", "battle.net", "blizzard", "riot",
+    "minecraft", "league of legends", "valorant", "counter-strike", "cs2", "dota",
+    "overwatch", "genshin", "honkai", "warframe", "league client",
+    ".game", "launcher", "gamebar", "playnite"
+]
+video = [
+    "bilibili", "youtube", "netflix", "twitch", "iqiyi", "youku", "tencent video",
+    "mpv", "vlc", "potplayer", "iina", "kodi", "plex", "infuse",
+    "tv", "video", "movie"
+]
+music = [
+    "spotify", "apple music", "netease music", "qq music", "cloudmusic",
+    "foobar", "musicbee", "deezer", "tidal"
+]
+communication = [
+    "wechat", "weixin", "qq", "discord", "slack", "telegram", "teams",
+    "zoom", "skype", "signal", "whatsapp", "lark", "feishu", "dingtalk"
+]
+browsing = [
+    "chrome", "firefox", "edge", "safari", "brave", "opera", "arc",
+    "vivaldi", "tor browser"
+]
+productivity = [
+    "notion", "obsidian", "logseq", "evernote", "onenote", "bear",
+    "word", "excel", "powerpoint", "keynote", "pages", "numbers",
+    "figma", "sketch", "adobe", "photoshop", "illustrator", "indesign",
+    "blender", "unity", "unreal"
+]
