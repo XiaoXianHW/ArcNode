@@ -7,7 +7,7 @@ use std::thread;
 use std::time::Duration;
 use cocoa::base::{id, nil};
 use cocoa::foundation::NSAutoreleasePool;
-use objc::{msg_send, sel, sel_impl};
+use objc::{class, msg_send, sel, sel_impl};
 use std::sync::OnceLock;
 
 static DEVICE_ID: OnceLock<String> = OnceLock::new();
@@ -122,7 +122,7 @@ unsafe fn get_browser_window_title() -> Option<String> {
     
     for i in 0..cf_array.len() {
         if let Some(window_info) = cf_array.get(i) {
-            let dict = window_info as core_foundation::dictionary::CFDictionaryRef;
+            let dict = *window_info as core_foundation::dictionary::CFDictionaryRef;
             
             let layer_key = CFString::new("kCGWindowLayer");
             let layer_value = core_foundation::dictionary::CFDictionaryGetValue(
