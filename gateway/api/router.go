@@ -37,6 +37,9 @@ func (s *Server) Router() *gin.Engine {
 		api.GET("/stats/apps", s.handleAppStats)
 		api.GET("/stats/shortcuts", s.handleShortcutStats)
 		api.GET("/stats/summary", s.handleSummary)
+		api.GET("/stats/daily", s.handleDailyStats)
+		api.GET("/stats/heatmap", s.handleHeatmap)
+		api.GET("/stats/projects", s.handleProjectStats)
 		api.GET("/categories", s.handleCategoryRules)
 	}
 

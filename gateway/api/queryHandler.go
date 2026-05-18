@@ -154,6 +154,81 @@ func (s *Server) handleCategoryRules(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"rules": s.Classifier.Rules()})
 }
 
+func (s *Server) handleDailyStats(c *gin.Context) {
+	days := int(parseInt64(c.DefaultQuery("days", "30")))
+	if days <= 0 {
+		days = 30
+	}
+	end := parseInt64(c.Query("end"))
+	if end == 0 {
+		end = time.Now().Unix()
+	}
+	start := endOfDay(end) - int64(days)*86400
+	buckets, err := s.Store.DailyStats(c.Query("device_id"), c.Query("category"), start, endOfDay(end))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if buckets == nil {
+		buckets = []storage.DailyBucket{}
+	}
+	c.JSON(http.StatusOK, gin.H{"days": buckets, "start": start, "end": endOfDay(end)})
+}
+
+func (s *Server) handleHeatmap(c *gin.Context) {
+	days := int(parseInt64(c.DefaultQuery("days", "365")))
+	if days <= 0 {
+		days = 365
+	}
+	end := parseInt64(c.Query("end"))
+	if end == 0 {
+		end = time.Now().Unix()
+	}
+	endTs := endOfDay(end)
+	start := endTs - int64(days)*86400
+	buckets, err := s.Store.DailyStats(c.Query("device_id"), c.Query("category"), start, endTs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if buckets == nil {
+		buckets = []storage.DailyBucket{}
+	}
+	var maxDur int64
+	var totalDur int64
+	for _, b := range buckets {
+		totalDur += b.Duration
+		if b.Duration > maxDur {
+			maxDur = b.Duration
+		}
+	}
+	cur, longest, active := streaks(buckets, endTs)
+	c.JSON(http.StatusOK, gin.H{
+		"days":           buckets,
+		"start":          start,
+		"end":            endTs,
+		"max_duration":   maxDur,
+		"total_duration": totalDur,
+		"active_days":    active,
+		"current_streak": cur,
+		"longest_streak": longest,
+	})
+}
+
+func (s *Server) handleProjectStats(c *gin.Context) {
+	start, end := dateRange(c)
+	limit := int(parseInt64(c.DefaultQuery("limit", "20")))
+	projects, err := s.Store.ProjectStats(c.Query("device_id"), c.Query("category"), start, end, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if projects == nil {
+		projects = []storage.ProjectStat{}
+	}
+	c.JSON(http.StatusOK, gin.H{"projects": projects, "start": start, "end": end})
+}
+
 func parseInt64(s string) int64 {
 	if s == "" {
 		return 0
@@ -185,6 +260,52 @@ func dateRange(c *gin.Context) (int64, int64) {
 		}
 	}
 	startOfDay := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, loc)
-	endOfDay := startOfDay.Add(24 * time.Hour)
-	return startOfDay.Unix(), endOfDay.Unix()
+	end := startOfDay.Add(24 * time.Hour)
+	return startOfDay.Unix(), end.Unix()
+}
+
+func endOfDay(ts int64) int64 {
+	t := time.Unix(ts, 0).In(time.Local)
+	d := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.Local).Add(24 * time.Hour)
+	return d.Unix()
+}
+
+func streaks(buckets []storage.DailyBucket, endTs int64) (current, longest, active int) {
+	have := make(map[string]bool, len(buckets))
+	for _, b := range buckets {
+		if b.Duration > 0 {
+			have[b.Date] = true
+			active++
+		}
+	}
+	end := time.Unix(endTs, 0).In(time.Local).Add(-time.Second)
+	for d := end; ; d = d.AddDate(0, 0, -1) {
+		if !have[d.Format("2006-01-02")] {
+			break
+		}
+		current++
+	}
+	run := 0
+	dates := make([]string, 0, len(buckets))
+	for _, b := range buckets {
+		dates = append(dates, b.Date)
+	}
+	var prev time.Time
+	for _, ds := range dates {
+		t, err := time.ParseInLocation("2006-01-02", ds, time.Local)
+		if err != nil || !have[ds] {
+			run = 0
+			continue
+		}
+		if !prev.IsZero() && t.Sub(prev) == 24*time.Hour {
+			run++
+		} else {
+			run = 1
+		}
+		if run > longest {
+			longest = run
+		}
+		prev = t
+	}
+	return
 }

@@ -1,11 +1,15 @@
 export const CATEGORY_COLORS: Record<string, string> = {
-  coding: '#ffffff',
-  gaming: '#ff6b6b',
-  video: '#a78bfa',
-  music: '#34d399',
-  communication: '#fbbf24',
-  browsing: '#60a5fa',
-  productivity: '#f472b6',
+  coding: '#22c55e',
+  ai_tools: '#a78bfa',
+  design: '#f472b6',
+  gaming: '#ef4444',
+  video: '#8b5cf6',
+  music: '#10b981',
+  communication: '#f59e0b',
+  browsing: '#3b82f6',
+  productivity: '#ec4899',
+  reading: '#06b6d4',
+  social: '#fb7185',
   uncategorized: '#525252',
 };
 

@@ -90,6 +90,30 @@ export interface Summary {
   idle: { idle_seconds: number; active_seconds: number };
 }
 
+export interface DailyBucket {
+  date: string;
+  duration: number;
+  count: number;
+}
+
+export interface ProjectStat {
+  window_title: string;
+  process_name: string;
+  duration: number;
+  count: number;
+}
+
+export interface Heatmap {
+  days: DailyBucket[];
+  start: number;
+  end: number;
+  max_duration: number;
+  total_duration: number;
+  active_days: number;
+  current_streak: number;
+  longest_streak: number;
+}
+
 function qs(params: Record<string, string | number | undefined>): string {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
@@ -120,4 +144,10 @@ export const api = {
     limit?: number;
   }) => request<{ events: EventItem[] }>(`/events${qs(params)}`),
   getRules: () => request<{ rules: Record<string, string[]> }>('/categories'),
+  getDaily: (params: { device_id?: string; category?: string; days?: number; end?: number }) =>
+    request<{ days: DailyBucket[]; start: number; end: number }>(`/stats/daily${qs(params)}`),
+  getHeatmap: (params: { device_id?: string; category?: string; days?: number; end?: number }) =>
+    request<Heatmap>(`/stats/heatmap${qs(params)}`),
+  getProjects: (params: { device_id?: string; category?: string; date?: string; limit?: number }) =>
+    request<{ projects: ProjectStat[] }>(`/stats/projects${qs(params)}`),
 };
