@@ -230,7 +230,7 @@ pub fn start_monitoring(device_id: String, storage: Arc<Storage>, running: Arc<A
         
         info!("XRecord version: {}.{}", major_version, minor_version);
         
-        let clients = XRecordAllClients;
+        let mut clients: XRecordClientSpec = XRecordAllClients;
         let mut ranges = XRecordRange {
             core_requests: XRecordRange8 {
                 first: 0,
@@ -276,12 +276,13 @@ pub fn start_monitoring(device_id: String, storage: Arc<Storage>, running: Arc<A
             client_died: False,
         };
         
+        let mut ranges_ptr: *mut XRecordRange = &mut ranges;
         let context = XRecordCreateContext(
             display,
             0,
-            &clients,
+            &mut clients,
             1,
-            &mut &mut ranges as *mut *mut XRecordRange,
+            &mut ranges_ptr,
             1,
         );
         
@@ -300,11 +301,13 @@ pub fn start_monitoring(device_id: String, storage: Arc<Storage>, running: Arc<A
             return Err(anyhow::anyhow!("Cannot open second display"));
         }
         
-        let running_clone = running.clone();
+        let record_display_addr = record_display as usize;
+        let context_value = context;
         let record_thread = thread::spawn(move || {
+            let rd = record_display_addr as *mut Display;
             unsafe {
-                XRecordEnableContext(record_display, context, Some(event_callback), ptr::null_mut());
-                XCloseDisplay(record_display);
+                XRecordEnableContext(rd, context_value, Some(event_callback), ptr::null_mut());
+                XCloseDisplay(rd);
             }
         });
         
