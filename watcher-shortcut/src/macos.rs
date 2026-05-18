@@ -1,17 +1,12 @@
 use anyhow::Result;
-use core_foundation::machport::CFMachPort;
-use core_foundation::runloop::{CFRunLoop, CFRunLoopMode, CFRunLoopRef};
+use core_foundation::runloop::{kCFRunLoopDefaultMode, CFRunLoop, CFRunLoopRunResult};
 use core_graphics::event::{
-    CGEvent, CGEventRef, CGEventTap, CGEventTapLocation, CGEventTapOptions, 
-    CGEventTapPlacement, CGEventType,
+    CGEvent, CGEventFlags, CGEventTap, CGEventTapLocation, CGEventTapOptions,
+    CGEventTapPlacement, CGEventType, EventField,
 };
-use core_graphics::event_source::CGEventSource;
 use log::{error, info};
-use std::ffi::c_void;
-use std::ptr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
-use std::thread;
 use std::time::Duration;
 use core::{Storage, TimelineEvent};
 
@@ -115,14 +110,14 @@ fn get_active_application_name() -> Option<String> {
     use cocoa::base::{id, nil};
     use cocoa::foundation::{NSString, NSAutoreleasePool};
     use cocoa::appkit::NSWorkspace;
-    
+
     unsafe {
         let pool = NSAutoreleasePool::new(nil);
         let workspace = NSWorkspace::sharedWorkspace(nil);
         let active_app = NSWorkspace::frontmostApplication(workspace);
-        
+
         if active_app != nil {
-            let app_name: id = unsafe { objc::msg_send![active_app, localizedName] };
+            let app_name: id = objc::msg_send![active_app, localizedName];
             if app_name != nil {
                 let name = NSString::UTF8String(app_name);
                 if !name.is_null() {
@@ -132,142 +127,110 @@ fn get_active_application_name() -> Option<String> {
                 }
             }
         }
-        
+
         pool.drain();
     }
-    
+
     None
 }
 
-extern "C" fn event_tap_callback(
-    _proxy: core_graphics::event::CGEventTapProxy,
-    event_type: CGEventType,
-    event: CGEventRef,
-    _user_info: *mut c_void,
-) -> CGEventRef {
-    if let Some(running) = RUNNING.get() {
-        if !running.load(Ordering::SeqCst) {
-            return event;
+fn handle_key_event(event: &CGEvent) {
+    let keycode = event.get_integer_value_field(EventField::KEYBOARD_EVENT_KEYCODE) as u16;
+    let flags = event.get_flags();
+
+    let cmd_pressed = flags.contains(CGEventFlags::CGEventFlagCommand);
+    let ctrl_pressed = flags.contains(CGEventFlags::CGEventFlagControl);
+    let alt_pressed = flags.contains(CGEventFlags::CGEventFlagAlternate);
+    let shift_pressed = flags.contains(CGEventFlags::CGEventFlagShift);
+
+    if !(cmd_pressed
+        || ctrl_pressed
+        || alt_pressed
+        || (shift_pressed && ![56, 60].contains(&keycode)))
+    {
+        return;
+    }
+
+    let mut shortcut_parts: Vec<&str> = Vec::new();
+    if ctrl_pressed { shortcut_parts.push("Ctrl"); }
+    if alt_pressed { shortcut_parts.push("Option"); }
+    if shift_pressed { shortcut_parts.push("Shift"); }
+    if cmd_pressed { shortcut_parts.push("Cmd"); }
+
+    let key_name = get_key_name(keycode);
+    shortcut_parts.push(&key_name);
+    let shortcut = shortcut_parts.join("+");
+    let app_name = get_active_application_name();
+
+    if let (Some(storage), Some(device_id)) = (STORAGE.get(), DEVICE_ID.get()) {
+        let ev = TimelineEvent::keyboard_shortcut(device_id.clone(), shortcut, app_name);
+        if let Err(e) = storage.insert_event(&ev) {
+            error!("Failed to insert keyboard shortcut event: {}", e);
         }
     }
-    
-    if event_type == CGEventType::KeyDown {
-        unsafe {
-            let cg_event = CGEvent::from_ptr(event);
-            let keycode = cg_event.get_integer_value_field(core_graphics::event::CGEventField::KeyboardEventKeycode) as u16;
-            let flags = cg_event.get_flags();
-            
-            let cmd_pressed = flags.contains(core_graphics::event::CGEventFlags::CGEventFlagCommand);
-            let ctrl_pressed = flags.contains(core_graphics::event::CGEventFlags::CGEventFlagControl);
-            let alt_pressed = flags.contains(core_graphics::event::CGEventFlags::CGEventFlagAlternate);
-            let shift_pressed = flags.contains(core_graphics::event::CGEventFlags::CGEventFlagShift);
-            
-            if cmd_pressed || ctrl_pressed || alt_pressed || 
-               (shift_pressed && ![56, 60].contains(&keycode)) {
-                
-                let mut shortcut_parts = Vec::new();
-                
-                if ctrl_pressed { shortcut_parts.push("Ctrl"); }
-                if alt_pressed { shortcut_parts.push("Option"); }
-                if shift_pressed { shortcut_parts.push("Shift"); }
-                if cmd_pressed { shortcut_parts.push("Cmd"); }
-                
-                let key_name = get_key_name(keycode);
-                shortcut_parts.push(&key_name);
-                
-                let shortcut = shortcut_parts.join("+");
-                let app_name = get_active_application_name();
-                
-                if let (Some(storage), Some(device_id)) = (STORAGE.get(), DEVICE_ID.get()) {
-                    let event = TimelineEvent::keyboard_shortcut(
-                        device_id.clone(),
-                        shortcut,
-                        app_name,
-                    );
-                    
-                    if let Err(e) = storage.insert_event(&event) {
-                        error!("Failed to insert keyboard shortcut event: {}", e);
-                    }
-                }
-            }
-        }
-    }
-    
-    event
 }
 
-pub fn start_monitoring(device_id: String, storage: Arc<Storage>, running: Arc<AtomicBool>) -> Result<()> {
+pub fn start_monitoring(
+    device_id: String,
+    storage: Arc<Storage>,
+    running: Arc<AtomicBool>,
+) -> Result<()> {
     info!("Starting shortcut monitoring on macOS...");
-    
-    STORAGE.set(storage).map_err(|_| anyhow::anyhow!("Failed to set storage"))?;
-    DEVICE_ID.set(device_id).map_err(|_| anyhow::anyhow!("Failed to set device ID"))?;
-    RUNNING.set(running.clone()).map_err(|_| anyhow::anyhow!("Failed to set running flag"))?;
-    
-    let trusted = unsafe {
-        core_graphics::access::ax_is_process_trusted()
-    };
-    
-    if !trusted {
-        error!("Application needs accessibility permissions to monitor keyboard events");
-        return Err(anyhow::anyhow!("Accessibility permissions required"));
-    }
-    
-    let event_mask = (1 << CGEventType::KeyDown as u64);
-    let event_tap = unsafe {
-        CGEventTap::new(
-            CGEventTapLocation::HID,
-            CGEventTapPlacement::HeadInsertEventTap,
-            CGEventTapOptions::Default,
-            event_mask,
-            event_tap_callback,
-            ptr::null_mut(),
-        )
-    };
-    
-    match event_tap {
-        Ok(tap) => {
-            let run_loop_source = tap.mach_port.create_runloop_source(0)?;
-            let run_loop = unsafe { CFRunLoop::get_current() };
-            
-            let default_mode = unsafe { 
-                core_foundation::string::CFString::wrap_under_get_rule(kCFRunLoopDefaultMode) 
-            };
-            
-            unsafe {
-                run_loop.add_source(&run_loop_source, default_mode);
-            }
-            
-            tap.enable();
-            info!("Shortcut monitoring started on macOS");
-            while running.load(Ordering::SeqCst) {
-                unsafe {
-                    let result = CFRunLoop::run_in_mode(
-                        default_mode,
-                        0.1,
-                        false,
-                    );
-                    
-                    if result == core_foundation::runloop::kCFRunLoopRunStopped {
-                        break;
-                    }
+
+    STORAGE
+        .set(storage)
+        .map_err(|_| anyhow::anyhow!("Failed to set storage"))?;
+    DEVICE_ID
+        .set(device_id)
+        .map_err(|_| anyhow::anyhow!("Failed to set device ID"))?;
+    RUNNING
+        .set(running.clone())
+        .map_err(|_| anyhow::anyhow!("Failed to set running flag"))?;
+
+    let event_tap = CGEventTap::new(
+        CGEventTapLocation::HID,
+        CGEventTapPlacement::HeadInsertEventTap,
+        CGEventTapOptions::Default,
+        vec![CGEventType::KeyDown],
+        |_proxy, _event_type, event| {
+            if let Some(r) = RUNNING.get() {
+                if r.load(Ordering::SeqCst) {
+                    handle_key_event(event);
                 }
             }
-            
-            tap.disable();
-            unsafe {
-                run_loop.remove_source(&run_loop_source, default_mode);
-            }
-        }
-        Err(e) => {
-            error!("Failed to create event tap: {:?}", e);
-            return Err(anyhow::anyhow!("Failed to create event tap"));
+            None
+        },
+    )
+    .map_err(|_| {
+        anyhow::anyhow!("Failed to create event tap (accessibility permissions required?)")
+    })?;
+
+    let run_loop_source = event_tap
+        .mach_port
+        .create_runloop_source(0)
+        .map_err(|_| anyhow::anyhow!("Failed to create runloop source"))?;
+    let run_loop = CFRunLoop::get_current();
+
+    unsafe {
+        run_loop.add_source(&run_loop_source, kCFRunLoopDefaultMode);
+    }
+
+    event_tap.enable();
+    info!("Shortcut monitoring started on macOS");
+
+    while running.load(Ordering::SeqCst) {
+        let result = unsafe {
+            CFRunLoop::run_in_mode(kCFRunLoopDefaultMode, Duration::from_millis(100), false)
+        };
+        if result == CFRunLoopRunResult::Stopped {
+            break;
         }
     }
-    
+
+    unsafe {
+        run_loop.remove_source(&run_loop_source, kCFRunLoopDefaultMode);
+    }
+
     info!("Shortcut monitoring stopped on macOS");
     Ok(())
-}
-
-extern "C" {
-    static kCFRunLoopDefaultMode: core_foundation::string::CFStringRef;
 }
