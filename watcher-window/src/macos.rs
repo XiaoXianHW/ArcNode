@@ -118,9 +118,10 @@ unsafe fn get_browser_window_title() -> Option<String> {
         return None;
     }
     
-    let cf_array: core_foundation::array::CFArray<core_foundation::dictionary::CFDictionaryRef> =
+    use std::ffi::c_void;
+    let cf_array: core_foundation::array::CFArray<*const c_void> =
         core_foundation::array::CFArray::wrap_under_create_rule(window_list as _);
-    
+
     for i in 0..cf_array.len() {
         if let Some(window_info) = cf_array.get(i) {
             let dict = *window_info as core_foundation::dictionary::CFDictionaryRef;
