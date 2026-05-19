@@ -108,16 +108,16 @@ fn get_key_name(keycode: u16) -> String {
 
 fn get_active_application_name() -> Option<String> {
     use cocoa::base::{id, nil};
-    use cocoa::foundation::{NSString, NSAutoreleasePool};
-    use cocoa::appkit::NSWorkspace;
+    use cocoa::foundation::{NSAutoreleasePool, NSString};
+    use objc::{class, msg_send, sel, sel_impl};
 
     unsafe {
         let pool = NSAutoreleasePool::new(nil);
-        let workspace = NSWorkspace::sharedWorkspace(nil);
-        let active_app = NSWorkspace::frontmostApplication(workspace);
+        let workspace: id = msg_send![class!(NSWorkspace), sharedWorkspace];
+        let active_app: id = msg_send![workspace, frontmostApplication];
 
         if active_app != nil {
-            let app_name: id = objc::msg_send![active_app, localizedName];
+            let app_name: id = msg_send![active_app, localizedName];
             if app_name != nil {
                 let name = NSString::UTF8String(app_name);
                 if !name.is_null() {
