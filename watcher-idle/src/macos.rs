@@ -1,6 +1,13 @@
 use anyhow::Result;
-use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
+use core_graphics::event_source::CGEventSourceStateID;
 use log::{error, info};
+
+#[link(name = "CoreGraphics", kind = "framework")]
+extern "C" {
+    fn CGEventSourceSecondsSinceLastEventType(state: CGEventSourceStateID, event_type: u32) -> f64;
+}
+
+const K_CG_ANY_INPUT_EVENT_TYPE: u32 = !0u32;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
@@ -49,12 +56,11 @@ fn monitor_idle_time(device_id: String, storage: Arc<Storage>, running: Arc<Atom
 }
 
 fn get_idle_time_seconds() -> u64 {
-    let source = CGEventSource::new(CGEventSourceStateID::CombinedSessionState)
-        .expect("Failed to create event source");
-    
-    let idle_time_nanos = source.seconds_since_last_event_type(
-        core_graphics::event::CGEventType::Null
-    );
-    
-    idle_time_nanos as u64
+    let seconds = unsafe {
+        CGEventSourceSecondsSinceLastEventType(
+            CGEventSourceStateID::CombinedSessionState,
+            K_CG_ANY_INPUT_EVENT_TYPE,
+        )
+    };
+    seconds as u64
 }
