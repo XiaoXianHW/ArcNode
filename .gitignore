@@ -23,3 +23,17 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/**/*.tsbuildinfo
+
+# Gateway build output
+arcowo-gateway
+gateway/gateway
+gateway/gateway.db
+gateway/gateway.db-*
+gateway/config.toml
+gateway/web/dist/*
+!gateway/web/dist/.gitkeep

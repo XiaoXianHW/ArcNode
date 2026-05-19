@@ -1,0 +1,187 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release as (e.g. v0.1.0)"
+        required: true
+        default: "v0.0.0-dev"
+
+permissions:
+  contents: write
+
+jobs:
+  frontend:
+    name: build frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: gateway/web/dist
+          retention-days: 1
+
+  build:
+    name: build ${{ matrix.target }}
+    needs: frontend
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-amd64
+            runner: ubuntu-latest
+            rust_target: x86_64-unknown-linux-gnu
+            goos: linux
+            goarch: amd64
+            archive_ext: tar.gz
+          - target: linux-arm64
+            runner: ubuntu-24.04-arm
+            rust_target: aarch64-unknown-linux-gnu
+            goos: linux
+            goarch: arm64
+            archive_ext: tar.gz
+          - target: macos-amd64
+            runner: macos-13
+            rust_target: x86_64-apple-darwin
+            goos: darwin
+            goarch: amd64
+            archive_ext: tar.gz
+          - target: macos-arm64
+            runner: macos-latest
+            rust_target: aarch64-apple-darwin
+            goos: darwin
+            goarch: arm64
+            archive_ext: tar.gz
+          - target: windows-amd64
+            runner: windows-latest
+            rust_target: x86_64-pc-windows-msvc
+            goos: windows
+            goarch: amd64
+            archive_ext: zip
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache-dependency-path: gateway/go.sum
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: gateway/web/dist
+
+      - name: install linux deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config libx11-dev libxss-dev libxtst-dev
+
+      - name: build gateway
+        shell: bash
+        working-directory: gateway
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          set -e
+          OUT="arcowo-gateway"
+          if [ "$GOOS" = "windows" ]; then OUT="arcowo-gateway.exe"; fi
+          go build -trimpath -ldflags "-s -w" -o "$OUT" .
+
+      - name: build agent
+        shell: bash
+        run: |
+          set -e
+          cargo build --release --workspace --target ${{ matrix.rust_target }}
+
+      - name: stage artifacts
+        shell: bash
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -e
+          name="arcnode-${TAG}-${{ matrix.target }}"
+          mkdir -p "dist/$name"
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            cp gateway/arcowo-gateway.exe "dist/$name/"
+            cp "target/${{ matrix.rust_target }}/release/arcowo.exe" "dist/$name/"
+          else
+            cp gateway/arcowo-gateway "dist/$name/"
+            cp "target/${{ matrix.rust_target }}/release/arcowo" "dist/$name/"
+          fi
+          cp config.example.toml "dist/$name/agent.example.toml"
+          cp gateway/config.example.toml "dist/$name/gateway.example.toml" 2>/dev/null || true
+          cp README.md "dist/$name/" 2>/dev/null || true
+          ls -la "dist/$name"
+          cd dist
+          if [ "${{ matrix.archive_ext }}" = "zip" ]; then
+            if command -v 7z >/dev/null 2>&1; then
+              7z a -tzip "${name}.zip" "$name" >/dev/null
+            else
+              python -c "import shutil; shutil.make_archive('${name}','zip','.', '${name}')"
+            fi
+          else
+            tar czf "${name}.tar.gz" "$name"
+          fi
+          ls -la
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arcnode-${{ matrix.target }}
+          path: dist/arcnode-*.${{ matrix.archive_ext }}
+          retention-days: 7
+
+  release:
+    name: publish release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: arcnode-*
+          merge-multiple: true
+
+      - name: list
+        run: ls -la artifacts
+
+      - name: generate checksums
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: publish
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
