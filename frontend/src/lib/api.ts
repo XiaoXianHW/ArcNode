@@ -140,6 +140,148 @@ export interface CustomKeyword {
   created_at: number;
 }
 
+export interface FocusBlock {
+  category: string;
+  start_time: number;
+  end_time: number;
+  duration: number;
+  apps: number;
+}
+
+export interface FocusResponse {
+  blocks: FocusBlock[];
+  start: number;
+  end: number;
+  total_focus: number;
+  longest: number;
+  daily: { date: string; duration: number }[];
+  min_duration: number;
+  max_gap_seconds: number;
+}
+
+export interface SwitchBucket {
+  date: string;
+  switches: number;
+  unique_apps: number;
+}
+
+export interface HourlySwitch {
+  weekday: number;
+  hour: number;
+  switches: number;
+}
+
+export interface FlowDay {
+  date: string;
+  active_seconds: number;
+  idle_seconds: number;
+  focus_seconds: number;
+  switches: number;
+  unique_apps: number;
+  score: number;
+}
+
+export interface SessionBucket {
+  bucket: string;
+  min: number;
+  max: number;
+  count: number;
+  duration: number;
+}
+
+export interface FileStat {
+  file: string;
+  language: string;
+  duration: number;
+  count: number;
+}
+
+export interface ProjectDailyRow {
+  date: string;
+  project: string;
+  duration: number;
+}
+
+export interface AppPair {
+  a: string;
+  b: string;
+  count: number;
+}
+
+export interface VideoRow {
+  platform: string;
+  duration: number;
+  count: number;
+}
+
+export interface SedentaryDay {
+  date: string;
+  longest_stretch: number;
+  stretches_over_threshold: number;
+  total_active: number;
+  total_idle: number;
+}
+
+export interface UncategorizedRow {
+  process_name: string;
+  sample_title: string;
+  duration: number;
+  count: number;
+}
+
+export interface SystemSample {
+  timestamp: number;
+  cpu: number;
+  memory: number;
+  battery_pct?: number;
+}
+
+export interface LiveStatus {
+  device_id: string;
+  online: boolean;
+  idle: boolean;
+  last_event_at: number;
+  last_segment?: Segment;
+  recent_apps?: AppStat[];
+  idle_since?: number;
+}
+
+export interface IdleRatioDay {
+  date: string;
+  active: number;
+  idle: number;
+}
+
+export interface GameReport {
+  process_name: string;
+  title: string;
+  total_duration: number;
+  sessions: number;
+  avg_session: number;
+  max_session: number;
+  first_played: number;
+  last_played: number;
+  unique_days: number;
+}
+
+export interface WeeklyReport {
+  start: number;
+  end: number;
+  total_active: number;
+  total_focus: number;
+  top_categories: CategoryStat[];
+  top_apps: AppStat[];
+  top_languages: LanguageStat[];
+  top_games: AppStat[];
+  avg_flow_score: number;
+  best_day: string;
+  best_day_duration: number;
+  longest_focus: number;
+  busiest_hour: number;
+  busiest_weekday: number;
+  context_switches: number;
+}
+
 function qs(params: Record<string, string | number | undefined>): string {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
@@ -187,4 +329,52 @@ export const api = {
     request<CustomKeyword>('/custom-keywords', { method: 'POST', body: JSON.stringify(body) }),
   deleteCustomKeyword: (id: number) =>
     request<{ ok: true }>(`/custom-keywords/${id}`, { method: 'DELETE' }),
+
+  getFocus: (params: { device_id?: string; category?: string; days?: number; min_duration?: number; max_gap?: number }) =>
+    request<FocusResponse>(`/stats/focus${qs(params)}`),
+  getSwitches: (params: { device_id?: string; days?: number }) =>
+    request<{ daily: SwitchBucket[]; hourly: HourlySwitch[]; start: number; end: number }>(`/stats/switches${qs(params)}`),
+  getFlow: (params: { device_id?: string; days?: number }) =>
+    request<{ days: FlowDay[]; start: number; end: number }>(`/stats/flow${qs(params)}`),
+  getSessions: (params: { device_id?: string; category?: string; days?: number }) =>
+    request<{ buckets: SessionBucket[]; start: number; end: number }>(`/stats/sessions${qs(params)}`),
+  getFiles: (params: { device_id?: string; days?: number; limit?: number }) =>
+    request<{ files: FileStat[]; start: number; end: number }>(`/stats/files${qs(params)}`),
+  getProjectsDaily: (params: { device_id?: string; category?: string; days?: number }) =>
+    request<{ rows: ProjectDailyRow[]; start: number; end: number }>(`/stats/projects-daily${qs(params)}`),
+  getAppPairs: (params: { device_id?: string; days?: number; limit?: number }) =>
+    request<{ pairs: AppPair[]; start: number; end: number }>(`/stats/app-pairs${qs(params)}`),
+  getVideoStats: (params: { device_id?: string; days?: number }) =>
+    request<{ platforms: VideoRow[]; start: number; end: number }>(`/stats/video${qs(params)}`),
+  getIdleRatio: (params: { device_id?: string; days?: number }) =>
+    request<{ days: IdleRatioDay[]; start: number; end: number }>(`/stats/idle-ratio${qs(params)}`),
+  getSedentary: (params: { device_id?: string; days?: number; threshold?: number }) =>
+    request<{ days: SedentaryDay[]; threshold: number; start: number; end: number }>(`/stats/sedentary${qs(params)}`),
+  getSuggestions: (params: { device_id?: string; days?: number; limit?: number }) =>
+    request<{ items: UncategorizedRow[]; start: number; end: number }>(`/stats/suggestions${qs(params)}`),
+  getSystem: (params: { device_id?: string; days?: number }) =>
+    request<{ samples: SystemSample[]; start: number; end: number }>(`/stats/system${qs(params)}`),
+  getGames: (params: { device_id?: string; days?: number }) =>
+    request<{ games: GameReport[]; start: number; end: number }>(`/stats/games${qs(params)}`),
+  getLive: (device_id: string) => request<LiveStatus>(`/devices/${encodeURIComponent(device_id)}/live`),
+  getWeeklyReport: (params: { device_id?: string; days?: number }) =>
+    request<WeeklyReport>(`/stats/weekly-report${qs(params)}`),
 };
+
+export function exportSegmentsCSVURL(params: { device_id?: string; date?: string; category?: string; start?: number; end?: number }): string {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== '' && v !== null) search.set(k, String(v));
+  });
+  const s = search.toString();
+  return `/api/v1/export/segments.csv${s ? `?${s}` : ''}`;
+}
+
+export function exportEventsJSONURL(params: { device_id?: string; start?: number; end?: number; type?: string; limit?: number }): string {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== '' && v !== null) search.set(k, String(v));
+  });
+  const s = search.toString();
+  return `/api/v1/export/events.json${s ? `?${s}` : ''}`;
+}

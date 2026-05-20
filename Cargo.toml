@@ -6,6 +6,7 @@ members = [
     "watcher-idle",
     "watcher-process",
     "watcher-shortcut",
+    "watcher-system",
     "app",
 ]
 
