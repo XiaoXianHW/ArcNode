@@ -5,7 +5,7 @@ import { Card } from '../components/Card';
 import { Empty, ErrorState } from '../components/Empty';
 import { useDeviceContext } from '../state/deviceContext';
 import { useI18n } from '../state/i18nContext';
-import { api, CustomKeyword } from '../lib/api';
+import { api, CustomKeyword, KeywordScope } from '../lib/api';
 import { useAsync } from '../hooks/useAsync';
 import { formatDuration } from '../lib/format';
 import { categoryColor } from '../lib/colors';
@@ -13,6 +13,7 @@ import { useChartTokens } from '../lib/chartTokens';
 
 const DEFAULT_CATS = [
   'coding',
+  'terminal',
   'gaming',
   'ai_tools',
   'design',
@@ -159,6 +160,7 @@ function CustomKeywordsCard({
 }) {
   const { t } = useI18n();
   const [cat, setCat] = useState(categories[0] ?? 'coding');
+  const [scope, setScope] = useState<KeywordScope>('process');
   const [keyword, setKeyword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string>('');
@@ -169,7 +171,7 @@ function CustomKeywordsCard({
     setSubmitting(true);
     setErr('');
     try {
-      await api.addCustomKeyword({ category: cat, keyword: value });
+      await api.addCustomKeyword({ category: cat, keyword: value, scope });
       setKeyword('');
       onChanged();
     } catch (e) {
@@ -203,9 +205,22 @@ function CustomKeywordsCard({
             </option>
           ))}
         </select>
+        <select
+          className="input"
+          value={scope}
+          onChange={(e) => setScope(e.target.value as KeywordScope)}
+          title={t('categories.scopeHint')}
+        >
+          <option value="process">{t('categories.scope.process')}</option>
+          <option value="title">{t('categories.scope.title')}</option>
+        </select>
         <input
           className="input flex-1 min-w-[180px]"
-          placeholder={t('categories.addPlaceholder')}
+          placeholder={
+            scope === 'process'
+              ? t('categories.addPlaceholder.process')
+              : t('categories.addPlaceholder.title')
+          }
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
           onKeyDown={(e) => {
@@ -225,32 +240,70 @@ function CustomKeywordsCard({
       ) : keywords.length === 0 ? (
         <p className="mt-3 text-sm text-muted">{t('common.empty')}</p>
       ) : (
-        <div className="mt-4 space-y-3">
-          {Object.entries(grouped).map(([c, items]) => (
-            <div key={c}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="h-2 w-2 rounded-full" style={{ background: categoryColor(c) }} />
-                <h3 className="text-sm font-medium">{c}</h3>
-                <span className="text-xs text-muted">{items.length}</span>
+        <div className="mt-4 space-y-4">
+          {Object.entries(grouped).map(([c, items]) => {
+            const procItems = items.filter((k) => k.scope !== 'title');
+            const titleItems = items.filter((k) => k.scope === 'title');
+            return (
+              <div key={c}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ background: categoryColor(c) }}
+                  />
+                  <h3 className="text-sm font-medium">{c}</h3>
+                  <span className="text-xs text-muted">{items.length}</span>
+                </div>
+                {procItems.length > 0 && (
+                  <KeywordRow
+                    label={t('categories.scope.process')}
+                    items={procItems}
+                    onRemove={remove}
+                  />
+                )}
+                {titleItems.length > 0 && (
+                  <KeywordRow
+                    label={t('categories.scope.title')}
+                    items={titleItems}
+                    onRemove={remove}
+                  />
+                )}
               </div>
-              <div className="flex flex-wrap gap-1">
-                {items.map((k) => (
-                  <span key={k.id} className="pill font-mono text-[11px]">
-                    {k.keyword}
-                    <button
-                      onClick={() => remove(k.id)}
-                      className="ml-1 text-muted hover:text-fg"
-                      title={t('common.delete')}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </Card>
+  );
+}
+
+function KeywordRow({
+  label,
+  items,
+  onRemove,
+}: {
+  label: string;
+  items: CustomKeyword[];
+  onRemove: (id: number) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="mb-2 last:mb-0">
+      <p className="text-[10px] uppercase tracking-wider text-muted mb-1">{label}</p>
+      <div className="flex flex-wrap gap-1">
+        {items.map((k) => (
+          <span key={k.id} className="pill font-mono text-[11px]">
+            {k.keyword}
+            <button
+              onClick={() => onRemove(k.id)}
+              className="ml-1 text-muted hover:text-fg"
+              title={t('common.delete')}
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }

@@ -25,6 +25,7 @@ func (s *Server) handleAddCustomKeyword(c *gin.Context) {
 	var body struct {
 		Category string `json:"category"`
 		Keyword  string `json:"keyword"`
+		Scope    string `json:"scope"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -34,7 +35,7 @@ func (s *Server) handleAddCustomKeyword(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "category and keyword required"})
 		return
 	}
-	kw, err := s.Store.AddCustomKeyword(body.Category, body.Keyword)
+	kw, err := s.Store.AddCustomKeyword(body.Category, body.Keyword, body.Scope)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

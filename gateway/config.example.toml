@@ -7,42 +7,28 @@ db_path = "./gateway.db"
 # 时间线分段合并阈值（秒），相邻事件间隔小于此值视为同一段
 segment_gap_seconds = 60
 
-# 分类规则（关键字匹配 process_name + window_title，大小写不敏感）
-[categories]
-coding = [
-    "code", "vscode", "cursor", "zed", "sublime", "atom", "xcode",
-    "intellij", "idea", "pycharm", "goland", "webstorm", "rubymine", "clion", "rider", "phpstorm",
-    "vim", "nvim", "emacs", "helix",
-    "terminal", "iterm", "wezterm", "alacritty", "kitty", "tabby", "warp",
-    "github", "gitlab", "gitkraken", "sourcetree",
-    "android studio", "devstudio", "fleet"
-]
-gaming = [
-    "steam", "epic games", "epicgames", "battle.net", "blizzard", "riot",
-    "minecraft", "league of legends", "valorant", "counter-strike", "cs2", "dota",
-    "overwatch", "genshin", "honkai", "warframe", "league client",
-    ".game", "launcher", "gamebar", "playnite"
-]
-video = [
-    "bilibili", "youtube", "netflix", "twitch", "iqiyi", "youku", "tencent video",
-    "mpv", "vlc", "potplayer", "iina", "kodi", "plex", "infuse",
-    "tv", "video", "movie"
-]
-music = [
-    "spotify", "apple music", "netease music", "qq music", "cloudmusic",
-    "foobar", "musicbee", "deezer", "tidal"
-]
-communication = [
-    "wechat", "weixin", "qq", "discord", "slack", "telegram", "teams",
-    "zoom", "skype", "signal", "whatsapp", "lark", "feishu", "dingtalk"
-]
-browsing = [
-    "chrome", "firefox", "edge", "safari", "brave", "opera", "arc",
-    "vivaldi", "tor browser"
-]
-productivity = [
-    "notion", "obsidian", "logseq", "evernote", "onenote", "bear",
-    "word", "excel", "powerpoint", "keynote", "pages", "numbers",
-    "figma", "sketch", "adobe", "photoshop", "illustrator", "indesign",
-    "blender", "unity", "unreal"
-]
+# ============================================================
+# 分类规则
+# 内置规则已覆盖主流 IDE / 终端 / 游戏 / 浏览器 / IM 等，启动时
+# 会与下面的用户自定义条目合并。在前端「设置」页面也可以可视化
+# 增删，无需重启网关。
+#
+# 分类匹配优先级：
+#   1. 先按 process_name 命中（精准，不会被窗口标题污染）
+#   2. 若 process 命中的是 browsing（浏览器），再用 title 关键字
+#      尝试升级为更具体的分类（例如 youtube → video）
+#
+# v2 推荐写法（按 scope 拆开）：
+# ============================================================
+[category_rules.coding]
+process = ["kiro.exe", "code-server"]
+title   = []
+
+[category_rules.video]
+process = []
+title   = ["bilibili.com", " - youtube"]
+
+# 兼容旧写法（所有条目当作 process keyword 追加到对应分类）
+# [categories]
+# coding = ["my-custom-ide"]
+# gaming = ["my-game.exe"]

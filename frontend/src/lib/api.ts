@@ -133,11 +133,19 @@ export interface BalanceRow {
   duration: number;
 }
 
+export type KeywordScope = 'process' | 'title';
+
 export interface CustomKeyword {
   id: number;
   category: string;
   keyword: string;
+  scope: KeywordScope;
   created_at: number;
+}
+
+export interface CategoryRule {
+  process: string[];
+  title: string[];
 }
 
 export interface FocusBlock {
@@ -311,7 +319,7 @@ export const api = {
     category?: string;
     limit?: number;
   }) => request<{ events: EventItem[] }>(`/events${qs(params)}`),
-  getRules: () => request<{ rules: Record<string, string[]> }>('/categories'),
+  getRules: () => request<{ rules: Record<string, CategoryRule> }>('/categories'),
   getDaily: (params: { device_id?: string; category?: string; days?: number; end?: number }) =>
     request<{ days: DailyBucket[]; start: number; end: number }>(`/stats/daily${qs(params)}`),
   getHeatmap: (params: { device_id?: string; category?: string; days?: number; end?: number }) =>
@@ -325,7 +333,7 @@ export const api = {
   getBalance: (params: { device_id?: string; days?: number; end?: number }) =>
     request<{ rows: BalanceRow[]; start: number; end: number }>(`/stats/balance${qs(params)}`),
   listCustomKeywords: () => request<{ keywords: CustomKeyword[] }>('/custom-keywords'),
-  addCustomKeyword: (body: { category: string; keyword: string }) =>
+  addCustomKeyword: (body: { category: string; keyword: string; scope?: KeywordScope }) =>
     request<CustomKeyword>('/custom-keywords', { method: 'POST', body: JSON.stringify(body) }),
   deleteCustomKeyword: (id: number) =>
     request<{ ok: true }>(`/custom-keywords/${id}`, { method: 'DELETE' }),
