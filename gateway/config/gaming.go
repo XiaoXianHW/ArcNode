@@ -1,9 +1,11 @@
 package config
 
-// defaultGamingKeywords returns the curated list of process/window keywords used
-// to classify gaming activity. Entries are normalized to lower case at load time
-// and matched against process name + window title via substring contains.
-func defaultGamingKeywords() []string {
+// defaultGamingProcessKeywords returns the curated list of process_name
+// keywords used to classify gaming activity. Entries are normalized to lower
+// case at load time and matched against process_name only (title matching is
+// deliberately disabled for gaming to avoid e.g. a Chrome window titled
+// "EasyLAN - Minecraft Mod" being classified as gaming).
+func defaultGamingProcessKeywords() []string {
 	return []string{
 		// Launchers / storefronts
 		"steam", "steamwebhelper", "steam.exe", "epic games", "epicgameslauncher",
@@ -192,9 +194,5 @@ func defaultGamingKeywords() []string {
 		"crossfire", "crossfire hd", "tlbb", "lol mobile", "wild rift",
 		"clash of clans", "clash royale", "brawl stars",
 
-		// Generic indicators (catch-all)
-		"steamapps", "steamapps\\common", "steam\\steamapps",
-		"epicgames\\", "ubisoft\\games", "ea games\\", "battle.net games",
-		".exe -- ", " - steam", "playing on steam", "running game",
 	}
 }

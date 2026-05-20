@@ -87,6 +87,11 @@ const en: Dict = {
   'categories.customKeywords': 'Custom keywords',
   'categories.customKeywordsSub': 'Add your own classification rules. Saved on the gateway.',
   'categories.addPlaceholder': 'e.g. my-game.exe',
+  'categories.addPlaceholder.process': 'process name e.g. my-game.exe',
+  'categories.addPlaceholder.title': 'window title fragment e.g. youtube.com',
+  'categories.scope.process': 'process name',
+  'categories.scope.title': 'window title',
+  'categories.scopeHint': 'Where this keyword is matched',
   'categories.builtinTitle': 'Built-in rules',
 
   'coding.title': 'Coding',
@@ -354,6 +359,11 @@ const zh: Dict = {
   'categories.customKeywords': '自定义关键词',
   'categories.customKeywordsSub': '添加自己的归类规则，保存在 gateway 上',
   'categories.addPlaceholder': '例如：my-game.exe',
+  'categories.addPlaceholder.process': '进程名，例如：my-game.exe',
+  'categories.addPlaceholder.title': '窗口标题片段，例如：youtube.com',
+  'categories.scope.process': '进程名',
+  'categories.scope.title': '窗口标题',
+  'categories.scopeHint': '匹配进程名或窗口标题',
   'categories.builtinTitle': '内置规则',
 
   'coding.title': '编码',
