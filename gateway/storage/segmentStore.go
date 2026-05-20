@@ -3,6 +3,7 @@ package storage
 import (
 	"database/sql"
 	"strings"
+	"time"
 )
 
 type Segment struct {
@@ -271,10 +272,31 @@ func (s *Store) IdleStats(deviceID string, start, end int64) (IdleStat, error) {
 			idleStart = 0
 		}
 	}
-	if idleStart > 0 && end > idleStart {
-		out.IdleSeconds += end - idleStart
+	if err := rows.Err(); err != nil {
+		return out, err
 	}
-	total := end - start
+	// Bound the active window by the actual event range so an empty/early
+	// day doesn't report a full 24h of "active" time. The window is
+	// [first_event, min(last_event, end, now)].
+	firstTs, lastTs, errR := s.eventRange(deviceID, start, end)
+	if errR != nil {
+		return out, errR
+	}
+	if firstTs == 0 || lastTs == 0 {
+		return out, nil
+	}
+	now := time.Now().Unix()
+	upper := lastTs
+	if end < upper {
+		upper = end
+	}
+	if now < upper {
+		upper = now
+	}
+	if idleStart > 0 && upper > idleStart {
+		out.IdleSeconds += upper - idleStart
+	}
+	total := upper - firstTs
 	if total < 0 {
 		total = 0
 	}
@@ -282,5 +304,17 @@ func (s *Store) IdleStats(deviceID string, start, end int64) (IdleStat, error) {
 	if out.ActiveSeconds < 0 {
 		out.ActiveSeconds = 0
 	}
-	return out, rows.Err()
+	return out, nil
+}
+
+func (s *Store) eventRange(deviceID string, start, end int64) (int64, int64, error) {
+	var first, last sql.NullInt64
+	err := s.DB.QueryRow(`
+		SELECT MIN(timestamp), MAX(timestamp) FROM events
+		WHERE device_id=? AND timestamp BETWEEN ? AND ?
+	`, deviceID, start, end).Scan(&first, &last)
+	if err != nil {
+		return 0, 0, err
+	}
+	return first.Int64, last.Int64, nil
 }

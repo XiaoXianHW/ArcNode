@@ -120,3 +120,32 @@ func nullable(s string) sql.NullString {
 	}
 	return sql.NullString{String: s, Valid: true}
 }
+
+type EventTypeCount struct {
+	EventType string `json:"event_type"`
+	Count     int64  `json:"count"`
+}
+
+func (s *Store) EventTypeCounts(deviceID string, start, end int64) ([]EventTypeCount, error) {
+	where := []string{"timestamp BETWEEN ? AND ?"}
+	args := []interface{}{start, end}
+	if deviceID != "" {
+		where = append(where, "device_id=?")
+		args = append(args, deviceID)
+	}
+	q := `SELECT event_type, COUNT(*) FROM events WHERE ` + strings.Join(where, " AND ") + ` GROUP BY event_type ORDER BY COUNT(*) DESC`
+	rows, err := s.DB.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []EventTypeCount
+	for rows.Next() {
+		var c EventTypeCount
+		if err := rows.Scan(&c.EventType, &c.Count); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
