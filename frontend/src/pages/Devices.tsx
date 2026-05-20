@@ -1,19 +1,21 @@
 import { Card } from '../components/Card';
 import { Empty, ErrorState } from '../components/Empty';
 import { useDeviceContext } from '../state/deviceContext';
+import { useI18n } from '../state/i18nContext';
 import { formatBytes, formatRelative, formatDate } from '../lib/format';
 
 export function Devices() {
   const { devices, loading, error, selectedId, selectDevice } = useDeviceContext();
+  const { t } = useI18n();
 
-  if (loading) return <p className="text-sm text-muted">Loading…</p>;
+  if (loading) return <p className="text-sm text-muted">{t('common.loading')}</p>;
   if (error) return <ErrorState error={error} />;
 
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Devices</h1>
-        <p className="text-sm text-muted mt-1">{devices.length} registered devices</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('devices.title')}</h1>
+        <p className="text-sm text-muted mt-1">{t('devices.subtitle')}</p>
       </header>
 
       {devices.length === 0 ? (

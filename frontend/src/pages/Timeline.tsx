@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Card } from '../components/Card';
 import { Empty, ErrorState } from '../components/Empty';
 import { useDeviceContext } from '../state/deviceContext';
+import { useI18n } from '../state/i18nContext';
 import { api, Segment } from '../lib/api';
 import { useAsync } from '../hooks/useAsync';
 import { formatDuration, formatTime } from '../lib/format';
@@ -9,6 +10,7 @@ import { categoryColor } from '../lib/colors';
 
 export function Timeline() {
   const { selectedId, date } = useDeviceContext();
+  const { t } = useI18n();
   const { data, loading, error } = useAsync(
     () => api.getSegments({ device_id: selectedId, date }),
     [selectedId, date],
@@ -22,15 +24,15 @@ export function Timeline() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Timeline</h1>
-        <p className="text-sm text-muted mt-1">Activity for {date}</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('timeline.title')}</h1>
+        <p className="text-sm text-muted mt-1">{t('timeline.subtitle', { date })}</p>
       </header>
 
-      <Card title="24h heatmap" subtitle="Each row is one hour of the day">
+      <Card title={t('timeline.hourGrid')} subtitle={t('timeline.hourGridSub')}>
         {segments.length === 0 ? <Empty /> : <HourGrid segments={segments} date={date} />}
       </Card>
 
-      <Card title="Segments" subtitle={`${segments.length} segments`}>
+      <Card title={t('timeline.segments')} subtitle={t('timeline.segmentsSub', { n: segments.length })}>
         {segments.length === 0 ? (
           <Empty />
         ) : (

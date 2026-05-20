@@ -1,28 +1,30 @@
 import { Card } from '../components/Card';
 import { Empty, ErrorState } from '../components/Empty';
 import { useDeviceContext } from '../state/deviceContext';
+import { useI18n } from '../state/i18nContext';
 import { api } from '../lib/api';
 import { useAsync } from '../hooks/useAsync';
 
 export function Shortcuts() {
   const { selectedId, date } = useDeviceContext();
+  const { t } = useI18n();
   const { data, loading, error } = useAsync(
     () => api.getShortcuts({ device_id: selectedId, date, limit: 100 }),
     [selectedId, date],
   );
 
-  if (loading) return <p className="text-sm text-muted">Loading…</p>;
+  if (loading) return <p className="text-sm text-muted">{t('common.loading')}</p>;
   if (error) return <ErrorState error={error} />;
   const shortcuts = data?.shortcuts ?? [];
 
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Shortcuts</h1>
-        <p className="text-sm text-muted mt-1">Most-used keyboard shortcuts for {date}</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('shortcuts.title')}</h1>
+        <p className="text-sm text-muted mt-1">{t('shortcuts.subtitle')}</p>
       </header>
 
-      <Card title="Top shortcuts" subtitle={`${shortcuts.length} unique combos`}>
+      <Card title={t('shortcuts.title')} subtitle={`${shortcuts.length}`}>
         {shortcuts.length === 0 ? (
           <Empty />
         ) : (

@@ -114,6 +114,32 @@ export interface Heatmap {
   longest_streak: number;
 }
 
+export interface LanguageStat {
+  language: string;
+  duration: number;
+  count: number;
+}
+
+export interface HourlyBucket {
+  weekday: number;
+  hour: number;
+  duration: number;
+  count: number;
+}
+
+export interface BalanceRow {
+  date: string;
+  category: string;
+  duration: number;
+}
+
+export interface CustomKeyword {
+  id: number;
+  category: string;
+  keyword: string;
+  created_at: number;
+}
+
 function qs(params: Record<string, string | number | undefined>): string {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
@@ -150,4 +176,15 @@ export const api = {
     request<Heatmap>(`/stats/heatmap${qs(params)}`),
   getProjects: (params: { device_id?: string; category?: string; date?: string; limit?: number }) =>
     request<{ projects: ProjectStat[] }>(`/stats/projects${qs(params)}`),
+  getLanguages: (params: { device_id?: string; days?: number; end?: number }) =>
+    request<{ languages: LanguageStat[]; start: number; end: number }>(`/stats/languages${qs(params)}`),
+  getHourly: (params: { device_id?: string; category?: string; days?: number; end?: number }) =>
+    request<{ buckets: HourlyBucket[]; start: number; end: number; max_duration: number }>(`/stats/hourly${qs(params)}`),
+  getBalance: (params: { device_id?: string; days?: number; end?: number }) =>
+    request<{ rows: BalanceRow[]; start: number; end: number }>(`/stats/balance${qs(params)}`),
+  listCustomKeywords: () => request<{ keywords: CustomKeyword[] }>('/custom-keywords'),
+  addCustomKeyword: (body: { category: string; keyword: string }) =>
+    request<CustomKeyword>('/custom-keywords', { method: 'POST', body: JSON.stringify(body) }),
+  deleteCustomKeyword: (id: number) =>
+    request<{ ok: true }>(`/custom-keywords/${id}`, { method: 'DELETE' }),
 };
