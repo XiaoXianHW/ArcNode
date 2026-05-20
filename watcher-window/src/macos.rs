@@ -21,6 +21,7 @@ pub fn start_monitoring(device_id: String, storage: Arc<Storage>, running: Arc<A
             let mut last_app_name = String::new();
             let mut last_window_title = String::new();
             let mut last_pid: u32 = 0;
+            let mut last_emit = std::time::Instant::now();
             
             info!("macOS window monitoring started");
             
@@ -51,9 +52,14 @@ pub fn start_monitoring(device_id: String, storage: Arc<Storage>, running: Arc<A
                             last_app_name = app_name_str;
                             last_window_title = window_title;
                             last_pid = pid_u32;
+                            last_emit = std::time::Instant::now();
                         } else if window_title != last_window_title && pid_u32 == last_pid {
                             handle_window_change(&storage, pid_u32, &app_name_str, &title_for_event, "Title changed");
                             last_window_title = window_title;
+                            last_emit = std::time::Instant::now();
+                        } else if last_emit.elapsed() >= Duration::from_secs(60) {
+                            handle_window_change(&storage, pid_u32, &app_name_str, &title_for_event, "Heartbeat");
+                            last_emit = std::time::Instant::now();
                         }
                     }
                 }
