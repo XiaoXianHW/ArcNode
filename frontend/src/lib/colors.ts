@@ -1,5 +1,6 @@
 export const CATEGORY_COLORS: Record<string, string> = {
   coding: '#22c55e',
+  terminal: '#14b8a6',
   ai_tools: '#a78bfa',
   design: '#f472b6',
   gaming: '#ef4444',

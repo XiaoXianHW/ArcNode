@@ -77,8 +77,9 @@ func (s *Store) migrate() error {
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			category TEXT NOT NULL,
 			keyword TEXT NOT NULL,
+			scope TEXT NOT NULL DEFAULT 'process',
 			created_at INTEGER NOT NULL,
-			UNIQUE(category, keyword)
+			UNIQUE(category, keyword, scope)
 		)`,
 	}
 	for _, stmt := range stmts {
@@ -86,5 +87,8 @@ func (s *Store) migrate() error {
 			return fmt.Errorf("migrate: %w", err)
 		}
 	}
+	// Best-effort column add for older databases. Ignore the "duplicate column name"
+	// error returned when the column already exists.
+	_, _ = s.DB.Exec(`ALTER TABLE custom_keywords ADD COLUMN scope TEXT NOT NULL DEFAULT 'process'`)
 	return nil
 }
