@@ -15,6 +15,44 @@ import (
 	"github.com/XiaoXianHW/ArcNode/gateway/storage"
 )
 
+// browserProcessTokens / terminalProcessTokens are used as a defensive
+// filter on top of the new classifier so legacy mis-classified segments
+// (recorded before the v3 process/title split) don't leak into the game
+// or wellness reports.
+var browserProcessTokens = []string{
+	"chrome", "chromium", "msedge", "edge", "firefox", "safari", "brave",
+	"opera", "vivaldi", "arc", "tor browser", "torbrowser", "thorium",
+	"sidekick", "orion", "360se", "360chrome", "qqbrowser", "ucbrowser",
+	"sogouexplorer", "zen browser",
+}
+
+var terminalProcessTokens = []string{
+	"windowsterminal", "wt.exe", "powershell", "pwsh", "cmd.exe", "conhost",
+	"iterm", "wezterm", "alacritty", "kitty", "warp", "hyper", "tabby",
+	"konsole", "xterm", "rxvt", "termite", "ghostty", "rio.exe", "tilix",
+	"qterminal", "deepin-terminal",
+}
+
+func isBrowserProcess(p string) bool {
+	p = strings.ToLower(p)
+	for _, k := range browserProcessTokens {
+		if strings.Contains(p, k) {
+			return true
+		}
+	}
+	return false
+}
+
+func isTerminalProcess(p string) bool {
+	p = strings.ToLower(p)
+	for _, k := range terminalProcessTokens {
+		if strings.Contains(p, k) {
+			return true
+		}
+	}
+	return false
+}
+
 func windowedRange(c *gin.Context, defaultDays int64) (int64, int64) {
 	days := parseInt64(c.DefaultQuery("days", fmt.Sprintf("%d", defaultDays)))
 	if days <= 0 {
@@ -652,6 +690,9 @@ func (s *Server) handleGameReport(c *gin.Context) {
 	agg := map[string]*gameReport{}
 	dayMap := map[string]map[string]bool{}
 	for _, sg := range segs {
+		if isBrowserProcess(sg.ProcessName) || isTerminalProcess(sg.ProcessName) {
+			continue
+		}
 		key := sg.ProcessName
 		r, ok := agg[key]
 		if !ok {

@@ -26,7 +26,7 @@ func main() {
 	}
 	defer store.Close()
 
-	classifier := category.New(cfg.Categories)
+	classifier := category.New(cfg.Rules())
 	if custom, err := store.CustomKeywordMap(); err == nil {
 		classifier.SetCustom(custom)
 	}

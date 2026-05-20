@@ -228,20 +228,24 @@ Content-Type: application/json
           <Empty />
         ) : (
           <div className="space-y-4">
-            {Object.entries(rules.data.rules).map(([cat, keywords]) => (
-              <div key={cat}>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="h-2 w-2 rounded-full" style={{ background: categoryColor(cat) }} />
-                  <h3 className="text-sm font-medium">{cat}</h3>
-                  <span className="text-xs text-muted">{keywords.length}</span>
+            {Object.entries(rules.data.rules).map(([cat, rule]) => {
+              const total = rule.process.length + rule.title.length;
+              return (
+                <div key={cat}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="h-2 w-2 rounded-full" style={{ background: categoryColor(cat) }} />
+                    <h3 className="text-sm font-medium">{cat}</h3>
+                    <span className="text-xs text-muted">{total}</span>
+                  </div>
+                  {rule.process.length > 0 && (
+                    <RuleRow label={t('categories.scope.process')} items={rule.process} />
+                  )}
+                  {rule.title.length > 0 && (
+                    <RuleRow label={t('categories.scope.title')} items={rule.title} />
+                  )}
                 </div>
-                <div className="flex flex-wrap gap-1">
-                  {keywords.map((k) => (
-                    <span key={k} className="pill font-mono text-[11px]">{k}</span>
-                  ))}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Card>
@@ -297,6 +301,21 @@ function RankColumn({ title, items }: { title: string; items: { label: string; v
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+function RuleRow({ label, items }: { label: string; items: string[] }) {
+  return (
+    <div className="mb-2 last:mb-0">
+      <p className="text-[10px] uppercase tracking-wider text-muted mb-1">{label}</p>
+      <div className="flex flex-wrap gap-1">
+        {items.map((k) => (
+          <span key={k} className="pill font-mono text-[11px]">
+            {k}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

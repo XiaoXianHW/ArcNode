@@ -1,17 +1,15 @@
-import { ChevronDown, Calendar, RefreshCw, Sun, Moon, Languages } from 'lucide-react';
+import { ChevronDown, Calendar, RefreshCw } from 'lucide-react';
 import { useDeviceContext } from '../state/deviceContext';
-import { useTheme } from '../state/themeContext';
 import { useI18n } from '../state/i18nContext';
 import { formatRelative } from '../lib/format';
 
 export function DeviceBar() {
   const { devices, selectedId, selectDevice, date, setDate, refresh, loading } = useDeviceContext();
-  const { theme, toggle } = useTheme();
-  const { locale, setLocale, t } = useI18n();
+  const { t } = useI18n();
   const selected = devices.find((d) => d.device_id === selectedId);
 
   return (
-    <div className="border-b border-border bg-surface/60 backdrop-blur">
+    <div className="sticky top-0 z-20 border-b border-border bg-surface/80 backdrop-blur">
       <div className="mx-auto max-w-6xl flex items-center gap-3 px-6 py-3 flex-wrap">
         <div className="relative">
           <select
@@ -53,25 +51,6 @@ export function DeviceBar() {
           ) : (
             <span>—</span>
           )}
-          <button
-            onClick={() => setLocale(locale === 'zh' ? 'en' : 'zh')}
-            className="btn-ghost"
-            title={t('settings.language')}
-          >
-            <Languages className="h-3.5 w-3.5" />
-            <span>{locale === 'zh' ? t('common.lang.zh') : t('common.lang.en')}</span>
-          </button>
-          <button
-            onClick={toggle}
-            className="btn-ghost"
-            title={t('settings.theme')}
-          >
-            {theme === 'dark' ? (
-              <Sun className="h-3.5 w-3.5" />
-            ) : (
-              <Moon className="h-3.5 w-3.5" />
-            )}
-          </button>
         </div>
       </div>
     </div>
