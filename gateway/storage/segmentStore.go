@@ -318,3 +318,111 @@ func (s *Store) eventRange(deviceID string, start, end int64) (int64, int64, err
 	}
 	return first.Int64, last.Int64, nil
 }
+
+// Classifier is the minimal interface used by ReclassifyAll so the storage
+// package does not depend on category.
+type Classifier interface {
+	Classify(processName, windowTitle string) string
+}
+
+type ReclassifyResult struct {
+	SegmentsScanned int64 `json:"segments_scanned"`
+	SegmentsUpdated int64 `json:"segments_updated"`
+	EventsScanned   int64 `json:"events_scanned"`
+	EventsUpdated   int64 `json:"events_updated"`
+}
+
+// ReclassifyAll re-runs the classifier over stored segments and
+// foreground_change events, updating any row whose stored category no
+// longer matches what the classifier returns. Idle/shortcut/system rows
+// keep their assigned category untouched.
+func (s *Store) ReclassifyAll(cl Classifier) (ReclassifyResult, error) {
+	var out ReclassifyResult
+	if cl == nil {
+		return out, nil
+	}
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return out, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	rows, err := tx.Query(`SELECT id, IFNULL(process_name,''), IFNULL(window_title,''), IFNULL(category,'') FROM segments`)
+	if err != nil {
+		return out, err
+	}
+	type update struct {
+		id  int64
+		cat string
+	}
+	var segUpdates []update
+	for rows.Next() {
+		var id int64
+		var proc, title, cur string
+		if err := rows.Scan(&id, &proc, &title, &cur); err != nil {
+			rows.Close()
+			return out, err
+		}
+		out.SegmentsScanned++
+		next := cl.Classify(proc, title)
+		if next != cur {
+			segUpdates = append(segUpdates, update{id, next})
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return out, err
+	}
+	for _, u := range segUpdates {
+		var cat interface{}
+		if u.cat == "" {
+			cat = nil
+		} else {
+			cat = u.cat
+		}
+		if _, err := tx.Exec(`UPDATE segments SET category=? WHERE id=?`, cat, u.id); err != nil {
+			return out, err
+		}
+	}
+	out.SegmentsUpdated = int64(len(segUpdates))
+
+	rows, err = tx.Query(`SELECT id, IFNULL(process_name,''), IFNULL(window_title,''), IFNULL(category,'') FROM events WHERE event_type='foreground_change'`)
+	if err != nil {
+		return out, err
+	}
+	var evUpdates []update
+	for rows.Next() {
+		var id int64
+		var proc, title, cur string
+		if err := rows.Scan(&id, &proc, &title, &cur); err != nil {
+			rows.Close()
+			return out, err
+		}
+		out.EventsScanned++
+		next := cl.Classify(proc, title)
+		if next != cur {
+			evUpdates = append(evUpdates, update{id, next})
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return out, err
+	}
+	for _, u := range evUpdates {
+		var cat interface{}
+		if u.cat == "" {
+			cat = nil
+		} else {
+			cat = u.cat
+		}
+		if _, err := tx.Exec(`UPDATE events SET category=? WHERE id=?`, cat, u.id); err != nil {
+			return out, err
+		}
+	}
+	out.EventsUpdated = int64(len(evUpdates))
+
+	if err := tx.Commit(); err != nil {
+		return out, err
+	}
+	return out, nil
+}
