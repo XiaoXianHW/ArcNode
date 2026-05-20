@@ -123,6 +123,78 @@ func (s *Server) mcpTools() []mcpTool {
 			Description: "List all user-defined custom classification keywords.",
 			InputSchema: schemaObject(nil, nil),
 		},
+		{
+			Name:        "get_focus_blocks",
+			Description: "Deep focus blocks (continuous category time, default >=25min) over the last N days.",
+			InputSchema: daysArg,
+		},
+		{
+			Name:        "get_flow",
+			Description: "Per-day flow score (0-100) computed from focus, switches, and unique app spread.",
+			InputSchema: daysArg,
+		},
+		{
+			Name:        "get_switches",
+			Description: "Context-switch frequency by day and weekday/hour grid.",
+			InputSchema: daysArg,
+		},
+		{
+			Name:        "get_sessions",
+			Description: "Session length histogram bucketed by duration.",
+			InputSchema: daysArg,
+		},
+		{
+			Name:        "get_files",
+			Description: "Top files (by extension) extracted from coding window titles over the last N days.",
+			InputSchema: daysArg,
+		},
+		{
+			Name:        "get_app_pairs",
+			Description: "Most frequent app co-occurrence pairs (consecutive foreground switches).",
+			InputSchema: daysArg,
+		},
+		{
+			Name:        "get_video_time",
+			Description: "Time spent on known video/streaming platforms over the last N days.",
+			InputSchema: daysArg,
+		},
+		{
+			Name:        "get_idle_ratio",
+			Description: "Per-day active vs idle seconds over the last N days.",
+			InputSchema: daysArg,
+		},
+		{
+			Name:        "get_sedentary",
+			Description: "Per-day longest sedentary stretch and count of stretches above threshold.",
+			InputSchema: daysArg,
+		},
+		{
+			Name:        "get_suggestions",
+			Description: "Top uncategorized processes by duration so they can be added as custom keywords.",
+			InputSchema: daysArg,
+		},
+		{
+			Name:        "get_system_samples",
+			Description: "Recent CPU/RAM/battery samples reported by the agent.",
+			InputSchema: daysArg,
+		},
+		{
+			Name:        "get_games",
+			Description: "Per-game (gaming category) annual report: total time, sessions, unique days.",
+			InputSchema: daysArg,
+		},
+		{
+			Name:        "get_live_status",
+			Description: "Realtime status for a device: online flag, last segment, idle state, recent apps.",
+			InputSchema: schemaObject(map[string]interface{}{
+				"device_id": schemaString("Device ID."),
+			}, []string{"device_id"}),
+		},
+		{
+			Name:        "get_weekly_report",
+			Description: "Auto-generated weekly summary with top categories, apps, languages, games, flow score, etc.",
+			InputSchema: daysArg,
+		},
 	}
 }
 
@@ -295,6 +367,54 @@ func (s *Server) callMCPTool(name string, raw json.RawMessage) (interface{}, err
 		return s.Classifier.Rules(), nil
 	case "list_custom_keywords":
 		return s.Store.ListCustomKeywords()
+	case "get_focus_blocks":
+		start, end := daysRange(7)
+		return s.Store.FocusBlocks(str("device_id"), str("category"), start, end, intArg("min_duration", 1500), intArg("max_gap", 120))
+	case "get_flow":
+		start, end := daysRange(14)
+		return s.flowFor(str("device_id"), start, end)
+	case "get_switches":
+		start, end := daysRange(14)
+		daily, err := s.Store.DailySwitches(str("device_id"), start, end)
+		if err != nil {
+			return nil, err
+		}
+		hourly, err := s.Store.HourlySwitches(str("device_id"), start, end)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{"daily": daily, "hourly": hourly}, nil
+	case "get_sessions":
+		start, end := daysRange(14)
+		return s.Store.SessionDistribution(str("device_id"), str("category"), start, end)
+	case "get_files":
+		start, end := daysRange(30)
+		return s.fileStatsFor(str("device_id"), start, end, int(intArg("limit", 30)))
+	case "get_app_pairs":
+		start, end := daysRange(14)
+		return s.Store.AppPairs(str("device_id"), start, end, int(intArg("limit", 30)))
+	case "get_video_time":
+		start, end := daysRange(30)
+		return s.videoFor(str("device_id"), start, end)
+	case "get_idle_ratio":
+		start, end := daysRange(14)
+		return s.idleRatioFor(str("device_id"), start, end)
+	case "get_sedentary":
+		start, end := daysRange(14)
+		return s.Store.DailySedentary(str("device_id"), start, end, intArg("threshold", 3600))
+	case "get_suggestions":
+		start, end := daysRange(14)
+		return s.Store.UncategorizedTop(str("device_id"), start, end, int(intArg("limit", 20)))
+	case "get_system_samples":
+		start, end := daysRange(1)
+		return s.Store.SystemSamples(str("device_id"), start, end)
+	case "get_games":
+		start, end := daysRange(365)
+		return s.gameReportFor(str("device_id"), start, end)
+	case "get_live_status":
+		return s.Store.LiveStatus(str("device_id"), 120, 24*3600)
+	case "get_weekly_report":
+		return s.weeklyReportFor(str("device_id"), intArg("days", 7))
 	}
 	return nil, fmt.Errorf("unknown tool: %s", name)
 }

@@ -1,0 +1,11 @@
+[package]
+name = "watcher-system"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+core = { path = "../core" }
+anyhow = { workspace = true }
+log = { workspace = true }
+sysinfo = { workspace = true }
+serde_json = { workspace = true }

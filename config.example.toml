@@ -23,6 +23,10 @@ process = true
 idle = true
 # 启用快捷键监控（记录键盘快捷键）
 shortcut = true
+# 启用系统资源采样（CPU / 内存）
+system = true
+# 系统采样间隔（秒）
+system_interval_secs = 60
 
 # 本地存储配置（默认）
 [storage]

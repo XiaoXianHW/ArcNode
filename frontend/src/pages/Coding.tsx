@@ -66,6 +66,51 @@ export function CategoryPage({ category, title, subtitle, showLanguages }: PageP
         : Promise.resolve({ languages: [], start: 0, end: 0 }),
     [selectedId, showLanguages],
   );
+  const files = useAsync(
+    () =>
+      showLanguages
+        ? api.getFiles({ device_id: selectedId, days: 14, limit: 15 })
+        : Promise.resolve({ files: [], start: 0, end: 0 }),
+    [selectedId, showLanguages],
+  );
+  const projectsDaily = useAsync(
+    () =>
+      showLanguages
+        ? api.getProjectsDaily({ device_id: selectedId, category, days: 14 })
+        : Promise.resolve({ rows: [], start: 0, end: 0 }),
+    [selectedId, category, showLanguages],
+  );
+
+  const topProjectNames = useMemo(() => {
+    if (!showLanguages) return [] as string[];
+    const totals = new Map<string, number>();
+    (projectsDaily.data?.rows ?? []).forEach((r) => {
+      totals.set(r.project, (totals.get(r.project) || 0) + r.duration);
+    });
+    return Array.from(totals.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([name]) => name);
+  }, [projectsDaily.data, showLanguages]);
+
+  const projectDailySeries = useMemo(() => {
+    if (!showLanguages || !projectsDaily.data) return [] as Array<Record<string, number | string>>;
+    const allowed = new Set(topProjectNames);
+    const byDate = new Map<string, Record<string, number>>();
+    projectsDaily.data.rows.forEach((r) => {
+      if (!allowed.has(r.project)) return;
+      const entry = byDate.get(r.date) ?? {};
+      entry[r.project] = (entry[r.project] || 0) + r.duration;
+      byDate.set(r.date, entry);
+    });
+    const dates = Array.from(byDate.keys()).sort();
+    return dates.map((date) => {
+      const entry = byDate.get(date) ?? {};
+      const row: Record<string, number | string> = { date, label: date.slice(5) };
+      topProjectNames.forEach((p) => (row[p] = entry[p] || 0));
+      return row;
+    });
+  }, [projectsDaily.data, topProjectNames, showLanguages]);
 
   const filteredApps = useMemo(
     () => (apps7.data?.apps ?? []).filter((a) => a.category === category).slice(0, 12),
@@ -223,6 +268,66 @@ export function CategoryPage({ category, title, subtitle, showLanguages }: PageP
           )}
         </Card>
       </div>
+
+      {showLanguages && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card title={t('coding.files')} subtitle={t('coding.filesSub')}>
+            {files.loading ? (
+              <p className="text-sm text-muted">{t('common.loading')}</p>
+            ) : files.error ? (
+              <ErrorState error={files.error} />
+            ) : (files.data?.files.length ?? 0) === 0 ? (
+              <Empty />
+            ) : (
+              <RankList
+                items={files.data!.files.map((f) => ({
+                  primary: f.file,
+                  secondary: f.language ? `.${f.language}` : undefined,
+                  value: f.duration,
+                }))}
+                color={color}
+              />
+            )}
+          </Card>
+
+          <Card title={t('coding.projectsDaily')} subtitle={t('coding.projectsDailySub')}>
+            {projectsDaily.loading ? (
+              <p className="text-sm text-muted">{t('common.loading')}</p>
+            ) : projectsDaily.error ? (
+              <ErrorState error={projectsDaily.error} />
+            ) : projectDailySeries.length === 0 || topProjectNames.length === 0 ? (
+              <Empty />
+            ) : (
+              <div className="h-56">
+                <ResponsiveContainer>
+                  <BarChart data={projectDailySeries} margin={{ left: 4, right: 4, top: 8 }}>
+                    <CartesianGrid stroke={tokens.border} strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: tokens.muted }} stroke={tokens.border} />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: tokens.muted }}
+                      stroke={tokens.border}
+                      tickFormatter={(v) => formatDuration(Number(v))}
+                    />
+                    <Tooltip
+                      contentStyle={{ background: tokens.tooltipBg, border: `1px solid ${tokens.border}`, fontSize: 12, color: tokens.fg }}
+                      formatter={(v: number, name: string) => [formatDuration(Number(v)), name]}
+                    />
+                    {topProjectNames.map((name, i) => (
+                      <Bar
+                        key={name}
+                        dataKey={name}
+                        stackId="p"
+                        fill={`hsl(${(i * 47) % 360} 65% 60%)`}
+                        radius={i === topProjectNames.length - 1 ? [3, 3, 0, 0] : undefined}
+                      />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

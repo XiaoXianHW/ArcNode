@@ -10,6 +10,10 @@ import {
   Gamepad2,
   Sparkles,
   Settings as SettingsIcon,
+  Target,
+  Heart,
+  Server,
+  User,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { DeviceBar } from './DeviceBar';
@@ -17,12 +21,16 @@ import { useI18n } from '../state/i18nContext';
 
 const NAV = [
   { to: '/', key: 'nav.dashboard', icon: LayoutDashboard, end: true, group: 'nav.group.overview' },
+  { to: '/profile', key: 'nav.profile', icon: User, group: 'nav.group.overview' },
   { to: '/timeline', key: 'nav.timeline', icon: Activity, group: 'nav.group.overview' },
   { to: '/categories', key: 'nav.categories', icon: PieChart, group: 'nav.group.overview' },
+  { to: '/focus', key: 'nav.focus', icon: Target, group: 'nav.group.activities' },
   { to: '/coding', key: 'nav.coding', icon: Code2, group: 'nav.group.activities' },
   { to: '/gaming', key: 'nav.gaming', icon: Gamepad2, group: 'nav.group.activities' },
   { to: '/insights', key: 'nav.insights', icon: Sparkles, group: 'nav.group.activities' },
   { to: '/shortcuts', key: 'nav.shortcuts', icon: Keyboard, group: 'nav.group.activities' },
+  { to: '/wellness', key: 'nav.wellness', icon: Heart, group: 'nav.group.wellness' },
+  { to: '/system', key: 'nav.system', icon: Server, group: 'nav.group.system' },
   { to: '/devices', key: 'nav.devices', icon: Cpu, group: 'nav.group.system' },
   { to: '/settings', key: 'nav.settings', icon: SettingsIcon, group: 'nav.group.system' },
 ];

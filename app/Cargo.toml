@@ -13,6 +13,7 @@ watcher-window = { path = "../watcher-window" }
 watcher-idle = { path = "../watcher-idle" }
 watcher-process = { path = "../watcher-process" }
 watcher-shortcut = { path = "../watcher-shortcut" }
+watcher-system = { path = "../watcher-system" }
 
 anyhow = { workspace = true }
 log = { workspace = true }
