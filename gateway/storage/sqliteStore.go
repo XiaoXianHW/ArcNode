@@ -73,6 +73,13 @@ func (s *Store) migrate() error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_segments_device_time ON segments(device_id, start_time)`,
 		`CREATE INDEX IF NOT EXISTS idx_segments_category ON segments(category)`,
+		`CREATE TABLE IF NOT EXISTS custom_keywords (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			category TEXT NOT NULL,
+			keyword TEXT NOT NULL,
+			created_at INTEGER NOT NULL,
+			UNIQUE(category, keyword)
+		)`,
 	}
 	for _, stmt := range stmts {
 		if _, err := s.DB.Exec(stmt); err != nil {

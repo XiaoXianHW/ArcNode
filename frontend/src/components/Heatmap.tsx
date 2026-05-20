@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { DailyBucket } from '../lib/api';
 import { formatDuration } from '../lib/format';
+import { useI18n } from '../state/i18nContext';
 
 interface Props {
   days: DailyBucket[];
@@ -15,6 +16,7 @@ const CELL = 12;
 const GAP = 3;
 
 export function Heatmap({ days, end, color = '#22c55e', weeks = 53 }: Props) {
+  const { t } = useI18n();
   const [hover, setHover] = useState<{ date: string; duration: number; x: number; y: number } | null>(null);
 
   const buckets = useMemo(() => {
@@ -65,18 +67,18 @@ export function Heatmap({ days, end, color = '#22c55e', weeks = 53 }: Props) {
     <div className="relative">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full" preserveAspectRatio="xMinYMin meet">
         {monthLabels.map((m) => (
-          <text key={m.col} x={28 + m.col * (CELL + GAP)} y={10} fontSize={9} fill="#666">
+          <text key={m.col} x={28 + m.col * (CELL + GAP)} y={10} fontSize={9} fill="rgb(var(--c-muted))">
             {m.label}
           </text>
         ))}
         {['Mon', 'Wed', 'Fri'].map((d, i) => (
-          <text key={d} x={0} y={26 + (i * 2 + 1) * (CELL + GAP)} fontSize={9} fill="#666">
+          <text key={d} x={0} y={26 + (i * 2 + 1) * (CELL + GAP)} fontSize={9} fill="rgb(var(--c-muted))">
             {d}
           </text>
         ))}
         {cells.cells.map((c) => {
           const t = c.duration > 0 ? Math.min(1, Math.log(c.duration + 1) / Math.log(max + 1)) : 0;
-          const fill = c.duration > 0 ? heatColor(color, t) : '#171717';
+          const fill = c.duration > 0 ? heatColor(color, t) : 'rgb(var(--c-cell-empty))';
           return (
             <rect
               key={c.date}
@@ -86,7 +88,7 @@ export function Heatmap({ days, end, color = '#22c55e', weeks = 53 }: Props) {
               height={CELL}
               rx={2}
               fill={fill}
-              stroke="rgba(255,255,255,0.04)"
+              stroke="rgb(var(--c-border) / 0.3)"
               onMouseEnter={(e) =>
                 setHover({
                   date: c.date,
@@ -101,8 +103,8 @@ export function Heatmap({ days, end, color = '#22c55e', weeks = 53 }: Props) {
         })}
       </svg>
       <div className="flex items-center gap-2 mt-2 text-xs text-muted">
-        <span>Less</span>
-        {[0, 0.25, 0.5, 0.75, 1].map((t, i) => (
+        <span>{t('common.less')}</span>
+        {[0, 0.25, 0.5, 0.75, 1].map((v, i) => (
           <span
             key={i}
             className="inline-block"
@@ -110,11 +112,11 @@ export function Heatmap({ days, end, color = '#22c55e', weeks = 53 }: Props) {
               width: 10,
               height: 10,
               borderRadius: 2,
-              background: t === 0 ? '#171717' : heatColor(color, t),
+              background: v === 0 ? 'rgb(var(--c-cell-empty))' : heatColor(color, v),
             }}
           />
         ))}
-        <span>More</span>
+        <span>{t('common.more')}</span>
       </div>
       {hover && (
         <div
@@ -122,7 +124,7 @@ export function Heatmap({ days, end, color = '#22c55e', weeks = 53 }: Props) {
           style={{ left: hover.x + 12, top: hover.y + 12 }}
         >
           <div className="font-mono">{hover.date}</div>
-          <div className="text-fg/80">{hover.duration > 0 ? formatDuration(hover.duration) : 'No activity'}</div>
+          <div className="text-fg/80">{hover.duration > 0 ? formatDuration(hover.duration) : t('common.empty')}</div>
         </div>
       )}
     </div>

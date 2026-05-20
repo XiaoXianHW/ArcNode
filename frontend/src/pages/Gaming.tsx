@@ -1,11 +1,7 @@
 import { CategoryPage } from './Coding';
+import { useI18n } from '../state/i18nContext';
 
 export function Gaming() {
-  return (
-    <CategoryPage
-      category="gaming"
-      title="Gaming"
-      subtitle="Playtime across launchers, MOBAs, FPS, MMOs and indies"
-    />
-  );
+  const { t } = useI18n();
+  return <CategoryPage category="gaming" title={t('gaming.title')} subtitle={t('gaming.subtitle')} />;
 }
