@@ -47,6 +47,25 @@ func (s *Server) Router() *gin.Engine {
 		api.GET("/custom-keywords", s.handleListCustomKeywords)
 		api.POST("/custom-keywords", s.handleAddCustomKeyword)
 		api.DELETE("/custom-keywords/:id", s.handleDeleteCustomKeyword)
+
+		api.GET("/stats/focus", s.handleFocusBlocks)
+		api.GET("/stats/switches", s.handleSwitches)
+		api.GET("/stats/flow", s.handleFlow)
+		api.GET("/stats/sessions", s.handleSessions)
+		api.GET("/stats/files", s.handleFileStats)
+		api.GET("/stats/projects-daily", s.handleProjectDaily)
+		api.GET("/stats/app-pairs", s.handleAppPairs)
+		api.GET("/stats/video", s.handleVideoStats)
+		api.GET("/stats/idle-ratio", s.handleIdleRatio)
+		api.GET("/stats/sedentary", s.handleSedentary)
+		api.GET("/stats/suggestions", s.handleSuggestions)
+		api.GET("/stats/system", s.handleSystemSamples)
+		api.GET("/stats/weekly-report", s.handleWeeklyReport)
+		api.GET("/stats/games", s.handleGameReport)
+		api.GET("/devices/:id/live", s.handleLive)
+
+		api.GET("/export/segments.csv", s.handleExportSegmentsCSV)
+		api.GET("/export/events.json", s.handleExportEventsJSON)
 	}
 
 	mcp := r.Group("/mcp")

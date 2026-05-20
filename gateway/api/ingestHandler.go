@@ -139,6 +139,8 @@ func normalizeEventType(t string) string {
 		return "idle_end"
 	case "KeyboardShortcut":
 		return "keyboard_shortcut"
+	case "SystemSample":
+		return "system_sample"
 	}
 	return t
 }

@@ -93,7 +93,17 @@ fn main() -> Result<()> {
                 watcher_shortcut::start_monitoring(config.device.id.clone(), storage.clone(), running.clone())?;
                 started_modules.push("shortcut");
             }
-            
+
+            if config.modules.system {
+                watcher_system::start_monitoring(
+                    config.device.id.clone(),
+                    storage.clone(),
+                    running.clone(),
+                    config.modules.system_interval_secs,
+                )?;
+                started_modules.push("system");
+            }
+
             if started_modules.is_empty() {
                 info!("No monitoring modules enabled, exiting...");
                 return Ok(());

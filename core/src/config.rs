@@ -28,7 +28,14 @@ pub struct ModulesConfig {
     pub process: bool,
     pub idle: bool,
     pub shortcut: bool,
+    #[serde(default = "default_system_on")]
+    pub system: bool,
+    #[serde(default = "default_system_interval")]
+    pub system_interval_secs: u64,
 }
+
+fn default_system_on() -> bool { true }
+fn default_system_interval() -> u64 { 60 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -67,6 +74,8 @@ impl Default for Config {
                 process: true,
                 idle: true,
                 shortcut: true,
+                system: true,
+                system_interval_secs: 60,
             },
         }
     }
