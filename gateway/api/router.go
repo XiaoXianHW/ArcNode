@@ -40,8 +40,19 @@ func (s *Server) Router() *gin.Engine {
 		api.GET("/stats/daily", s.handleDailyStats)
 		api.GET("/stats/heatmap", s.handleHeatmap)
 		api.GET("/stats/projects", s.handleProjectStats)
+		api.GET("/stats/languages", s.handleLanguageStats)
+		api.GET("/stats/hourly", s.handleHourlyStats)
+		api.GET("/stats/balance", s.handleBalanceStats)
 		api.GET("/categories", s.handleCategoryRules)
+		api.GET("/custom-keywords", s.handleListCustomKeywords)
+		api.POST("/custom-keywords", s.handleAddCustomKeyword)
+		api.DELETE("/custom-keywords/:id", s.handleDeleteCustomKeyword)
 	}
+
+	mcp := r.Group("/mcp")
+	mcp.Use(middleware.BearerAuth(s.Token))
+	mcp.POST("", s.handleMCP)
+	mcp.POST("/", s.handleMCP)
 
 	r.GET("/healthz", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })
 

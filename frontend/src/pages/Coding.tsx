@@ -3,26 +3,40 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGri
 import { Card, Stat } from '../components/Card';
 import { Empty, ErrorState } from '../components/Empty';
 import { Heatmap } from '../components/Heatmap';
+import { LanguageBar } from '../components/LanguageBar';
 import { useDeviceContext } from '../state/deviceContext';
+import { useI18n } from '../state/i18nContext';
 import { api } from '../lib/api';
 import { useAsync } from '../hooks/useAsync';
 import { formatDuration, todayISO } from '../lib/format';
 import { categoryColor } from '../lib/colors';
+import { useChartTokens } from '../lib/chartTokens';
 
 const CATEGORY = 'coding';
 
 export function Coding() {
-  return <CategoryPage category={CATEGORY} title="Coding" subtitle="Time at the keyboard across IDEs, editors and terminals" />;
+  const { t } = useI18n();
+  return (
+    <CategoryPage
+      category={CATEGORY}
+      title={t('coding.title')}
+      subtitle={t('coding.subtitle')}
+      showLanguages
+    />
+  );
 }
 
 interface PageProps {
   category: string;
   title: string;
   subtitle: string;
+  showLanguages?: boolean;
 }
 
-export function CategoryPage({ category, title, subtitle }: PageProps) {
+export function CategoryPage({ category, title, subtitle, showLanguages }: PageProps) {
   const { selectedId } = useDeviceContext();
+  const { t } = useI18n();
+  const tokens = useChartTokens();
   const color = categoryColor(category);
 
   const heat = useAsync(
@@ -44,6 +58,13 @@ export function CategoryPage({ category, title, subtitle }: PageProps) {
   const projects = useAsync(
     () => api.getProjects({ device_id: selectedId, category, limit: 15, date: today }),
     [selectedId, category, today],
+  );
+  const languages = useAsync(
+    () =>
+      showLanguages
+        ? api.getLanguages({ device_id: selectedId, days: 30 })
+        : Promise.resolve({ languages: [], start: 0, end: 0 }),
+    [selectedId, showLanguages],
   );
 
   const filteredApps = useMemo(
@@ -72,27 +93,27 @@ export function CategoryPage({ category, title, subtitle }: PageProps) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <Stat
-            label="Total (year)"
+            label={t('coding.totalYear')}
             value={heat.data ? formatDuration(heat.data.total_duration) : '—'}
-            sub={heat.data ? `${heat.data.active_days} active days` : undefined}
+            sub={heat.data ? t('coding.activeDays', { n: heat.data.active_days }) : undefined}
           />
         </Card>
         <Card>
           <Stat
-            label="Current streak"
-            value={heat.data ? `${heat.data.current_streak}d` : '—'}
-            sub={heat.data ? `longest ${heat.data.longest_streak}d` : undefined}
+            label={t('coding.currentStreak')}
+            value={heat.data ? `${heat.data.current_streak}${t('common.day')}` : '—'}
+            sub={heat.data ? t('coding.longestStreak', { n: heat.data.longest_streak }) : undefined}
           />
         </Card>
         <Card>
           <Stat
-            label="Best day"
+            label={t('coding.bestDay')}
             value={heat.data ? formatDuration(heat.data.max_duration) : '—'}
           />
         </Card>
         <Card>
           <Stat
-            label="Daily avg (30d)"
+            label={t('coding.dailyAvg')}
             value={
               daily30.data
                 ? formatDuration(
@@ -107,21 +128,35 @@ export function CategoryPage({ category, title, subtitle }: PageProps) {
         </Card>
       </div>
 
-      <Card title="Contributions" subtitle="Daily activity over the last year">
+      <Card title={t('coding.contributions')} subtitle={t('coding.contributionsSub')}>
         {heat.loading ? (
-          <p className="text-sm text-muted">Loading…</p>
+          <p className="text-sm text-muted">{t('common.loading')}</p>
         ) : heat.error ? (
           <ErrorState error={heat.error} />
         ) : (heat.data?.days.length ?? 0) === 0 ? (
-          <Empty message="No activity recorded yet" />
+          <Empty />
         ) : (
           <Heatmap days={heat.data!.days} start={heat.data!.start} end={heat.data!.end} color={color} weeks={53} />
         )}
       </Card>
 
-      <Card title="Last 30 days" subtitle="Daily time spent">
+      {showLanguages && (
+        <Card title={t('coding.languages')} subtitle={t('coding.languagesSub')}>
+          {languages.loading ? (
+            <p className="text-sm text-muted">{t('common.loading')}</p>
+          ) : languages.error ? (
+            <ErrorState error={languages.error} />
+          ) : (languages.data?.languages.length ?? 0) === 0 ? (
+            <Empty />
+          ) : (
+            <LanguageBar items={languages.data!.languages} />
+          )}
+        </Card>
+      )}
+
+      <Card title={t('coding.last30')} subtitle={t('coding.last30Sub')}>
         {daily30.loading ? (
-          <p className="text-sm text-muted">Loading…</p>
+          <p className="text-sm text-muted">{t('common.loading')}</p>
         ) : daily30.error ? (
           <ErrorState error={daily30.error} />
         ) : daily30Display.length === 0 ? (
@@ -130,15 +165,15 @@ export function CategoryPage({ category, title, subtitle }: PageProps) {
           <div className="h-56">
             <ResponsiveContainer>
               <BarChart data={daily30Display} margin={{ left: 4, right: 4, top: 8 }}>
-                <CartesianGrid stroke="#1f1f1f" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#666' }} interval={2} stroke="#333" />
+                <CartesianGrid stroke={tokens.border} strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: tokens.muted }} interval={2} stroke={tokens.border} />
                 <YAxis
-                  tick={{ fontSize: 10, fill: '#666' }}
-                  stroke="#333"
+                  tick={{ fontSize: 10, fill: tokens.muted }}
+                  stroke={tokens.border}
                   tickFormatter={(v) => formatDuration(Number(v))}
                 />
                 <Tooltip
-                  contentStyle={{ background: '#0a0a0a', border: '1px solid #1f1f1f', fontSize: 12 }}
+                  contentStyle={{ background: tokens.tooltipBg, border: `1px solid ${tokens.border}`, fontSize: 12, color: tokens.fg }}
                   formatter={(v: number) => formatDuration(Number(v))}
                   labelFormatter={(label, payload) => payload?.[0]?.payload?.date ?? label}
                 />
@@ -150,9 +185,9 @@ export function CategoryPage({ category, title, subtitle }: PageProps) {
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card title="Top apps" subtitle={`Most-used ${category} apps`}>
+        <Card title={t('coding.topApps')} subtitle={t('coding.topAppsSub', { category })}>
           {apps7.loading ? (
-            <p className="text-sm text-muted">Loading…</p>
+            <p className="text-sm text-muted">{t('common.loading')}</p>
           ) : apps7.error ? (
             <ErrorState error={apps7.error} />
           ) : filteredApps.length === 0 ? (
@@ -169,9 +204,9 @@ export function CategoryPage({ category, title, subtitle }: PageProps) {
           )}
         </Card>
 
-        <Card title="Top windows today" subtitle="What you focused on today">
+        <Card title={t('coding.topWindows')} subtitle={t('coding.topWindowsSub')}>
           {projects.loading ? (
-            <p className="text-sm text-muted">Loading…</p>
+            <p className="text-sm text-muted">{t('common.loading')}</p>
           ) : projects.error ? (
             <ErrorState error={projects.error} />
           ) : (projects.data?.projects.length ?? 0) === 0 ? (

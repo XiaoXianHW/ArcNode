@@ -8,38 +8,39 @@ import {
   Cpu,
   Code2,
   Gamepad2,
+  Sparkles,
   Settings as SettingsIcon,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { DeviceBar } from './DeviceBar';
+import { useI18n } from '../state/i18nContext';
 
 const NAV = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true, group: 'Overview' },
-  { to: '/timeline', label: 'Timeline', icon: Activity, group: 'Overview' },
-  { to: '/categories', label: 'Categories', icon: PieChart, group: 'Overview' },
-  { to: '/coding', label: 'Coding', icon: Code2, group: 'Activities' },
-  { to: '/gaming', label: 'Gaming', icon: Gamepad2, group: 'Activities' },
-  { to: '/shortcuts', label: 'Shortcuts', icon: Keyboard, group: 'Activities' },
-  { to: '/devices', label: 'Devices', icon: Cpu, group: 'System' },
-  { to: '/settings', label: 'Settings', icon: SettingsIcon, group: 'System' },
+  { to: '/', key: 'nav.dashboard', icon: LayoutDashboard, end: true, group: 'nav.group.overview' },
+  { to: '/timeline', key: 'nav.timeline', icon: Activity, group: 'nav.group.overview' },
+  { to: '/categories', key: 'nav.categories', icon: PieChart, group: 'nav.group.overview' },
+  { to: '/coding', key: 'nav.coding', icon: Code2, group: 'nav.group.activities' },
+  { to: '/gaming', key: 'nav.gaming', icon: Gamepad2, group: 'nav.group.activities' },
+  { to: '/insights', key: 'nav.insights', icon: Sparkles, group: 'nav.group.activities' },
+  { to: '/shortcuts', key: 'nav.shortcuts', icon: Keyboard, group: 'nav.group.activities' },
+  { to: '/devices', key: 'nav.devices', icon: Cpu, group: 'nav.group.system' },
+  { to: '/settings', key: 'nav.settings', icon: SettingsIcon, group: 'nav.group.system' },
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   return (
     <div className="flex min-h-full">
       <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-border bg-surface">
-        <div className="px-5 py-6">
-          <div className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded-sm bg-fg" />
-            <span className="text-base font-semibold tracking-tight">ArcNode</span>
-          </div>
-          <p className="mt-1 text-xs text-muted">Personal timeline</p>
+        <div className="px-5 pt-6 pb-3">
+          <span className="text-base font-semibold tracking-tight">{t('app.name')}</span>
+          <p className="mt-1 text-xs text-muted">{t('app.tagline')}</p>
         </div>
         <nav className="px-3 pb-6 flex-1 space-y-4">
           {Array.from(new Set(NAV.map((n) => n.group))).map((group) => (
             <div key={group} className="space-y-0.5">
-              <p className="px-2 mb-1 text-[10px] uppercase tracking-wider text-muted">{group}</p>
-              {NAV.filter((n) => n.group === group).map(({ to, label, icon: Icon, end }) => (
+              <p className="px-2 mb-1 text-[10px] uppercase tracking-wider text-muted">{t(group)}</p>
+              {NAV.filter((n) => n.group === group).map(({ to, key, icon: Icon, end }) => (
                 <NavLink
                   key={to}
                   to={to}
@@ -47,15 +48,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
                   className={({ isActive }) => clsx('nav-link', isActive && 'nav-link-active')}
                 >
                   <Icon className="h-4 w-4" />
-                  <span>{label}</span>
+                  <span>{t(key)}</span>
                 </NavLink>
               ))}
             </div>
           ))}
         </nav>
-        <div className="px-5 py-4 text-xs text-muted border-t border-border">
-          v0.1.0
-        </div>
+        <div className="px-5 py-4 text-xs text-muted border-t border-border">v0.2.0</div>
       </aside>
       <main className="flex-1 min-w-0 flex flex-col">
         <DeviceBar />
