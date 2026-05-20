@@ -26,9 +26,14 @@ func main() {
 	}
 	defer store.Close()
 
+	classifier := category.New(cfg.Categories)
+	if custom, err := store.CustomKeywordMap(); err == nil {
+		classifier.SetCustom(custom)
+	}
+
 	server := &api.Server{
 		Store:      store,
-		Classifier: category.New(cfg.Categories),
+		Classifier: classifier,
 		Token:      cfg.Token,
 		SegmentGap: cfg.SegmentGapSeconds,
 		WebFS:      web.FS(),

@@ -7,11 +7,12 @@ export function Empty({ message = 'No data yet' }: { message?: string }) {
   );
 }
 
-export function ErrorState({ error }: { error: string }) {
+export function ErrorState({ error }: { error: unknown }) {
+  const message = error instanceof Error ? error.message : typeof error === 'string' ? error : JSON.stringify(error);
   return (
     <div className="rounded-md border border-border bg-elevated p-4 text-sm text-fg/80">
       <p className="text-xs uppercase tracking-wider text-muted mb-1">Error</p>
-      <p className="font-mono text-fg">{error}</p>
+      <p className="font-mono text-fg">{message}</p>
     </div>
   );
 }
