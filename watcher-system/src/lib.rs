@@ -17,9 +17,9 @@ pub fn start_monitoring(
     let interval = if interval_secs == 0 { 60 } else { interval_secs };
     info!("Starting system sampler (interval={}s)", interval);
     thread::spawn(move || {
-        let mut sys = System::new();
+        let mut sys = System::new_all();
         sys.refresh_cpu();
-        thread::sleep(Duration::from_millis(200));
+        thread::sleep(Duration::from_millis(500));
         while running.load(Ordering::SeqCst) {
             sys.refresh_cpu();
             sys.refresh_memory();
@@ -48,8 +48,12 @@ pub fn start_monitoring(
 
             let ev = TimelineEvent::new(device_id.clone(), EventType::SystemSample)
                 .with_metadata(meta);
-            if let Err(e) = storage.insert_event(&ev) {
-                log::warn!("system sample push failed: {}", e);
+            match storage.insert_event(&ev) {
+                Ok(_) => info!(
+                    "system sample cpu={:.1}% mem={:.1}%",
+                    cpu, mem_pct
+                ),
+                Err(e) => log::warn!("system sample push failed: {}", e),
             }
             thread::sleep(Duration::from_secs(interval));
         }

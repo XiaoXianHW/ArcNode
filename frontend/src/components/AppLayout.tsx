@@ -73,12 +73,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden">
       <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-border bg-surface">
-        <div className="flex items-center gap-2.5 px-5 pt-5 pb-4 border-b border-border">
-          <BrandMark />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold tracking-tight leading-tight">{t('app.name')}</p>
-            <p className="text-[11px] text-muted truncate">{t('app.tagline')}</p>
-          </div>
+        <div className="px-5 pt-5 pb-4 border-b border-border">
+          <p className="text-sm font-semibold tracking-tight leading-tight">{t('app.name')}</p>
+          <p className="text-[11px] text-muted truncate">{t('app.tagline')}</p>
         </div>
 
         {selected ? (
@@ -179,13 +176,4 @@ export function AppLayout({ children }: { children: ReactNode }) {
   );
 }
 
-function BrandMark() {
-  return (
-    <div className="h-7 w-7 shrink-0 rounded-md bg-fg text-bg flex items-center justify-center">
-      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 20 L12 4 L21 20 Z" />
-        <path d="M8 20 L12 13 L16 20" />
-      </svg>
-    </div>
-  );
-}
+

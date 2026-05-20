@@ -266,6 +266,12 @@ func DefaultRules() map[string]category.Rules {
 				"reminders", "calendar.app", "fantastical", "cron",
 				"notion calendar",
 				"raycast", "alfred", "launchbar", "spotlight",
+				"explorer.exe", "windows explorer", "file explorer",
+				"finder", "finder.app",
+				"nautilus", "nemo", "thunar", "pcmanfm",
+				"caja", "rox-filer", "krusader", "doublecmd", "totalcmd.exe", "total commander",
+				"directory opus", "dopus", "xyplorer", "xyplorerfree",
+				"q-dir", "qdir", "freecommander", "multicommander",
 			},
 		},
 		"browsing": {

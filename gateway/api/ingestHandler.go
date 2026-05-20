@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -88,8 +89,10 @@ func (s *Server) handleEvents(c *gin.Context) {
 	defer func() { _ = tx.Rollback() }()
 
 	inserted := 0
+	typeCounts := map[string]int{}
 	for _, ev := range batch.Events {
 		evType := normalizeEventType(ev.EventType)
+		typeCounts[evType]++
 		processName, windowTitle, pid := extractMeta(ev.Metadata)
 		category := ev.Category
 		if category == "" {
@@ -121,6 +124,9 @@ func (s *Server) handleEvents(c *gin.Context) {
 	if err := tx.Commit(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+	if n, ok := typeCounts["system_sample"]; ok && n > 0 {
+		log.Printf("ingest device=%s system_sample=%d total=%d", batch.DeviceID, n, inserted)
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "inserted": inserted})
 }
