@@ -36,10 +36,21 @@ pub fn start_monitoring(device_id: String, storage: Arc<Storage>, running: Arc<A
             let mut last_window: u64 = 0;
             let mut last_title = String::new();
             let mut last_pid: u32 = 0;
+            let mut last_emit = std::time::Instant::now();
             
             info!("X11 window event hooks installed");
             
             while running.load(Ordering::SeqCst) {
+                if last_emit.elapsed() >= Duration::from_secs(60) {
+                    if let Some((_, title, pid)) = get_active_window_info(
+                        display, root, net_active_window, net_wm_name, utf8_string, net_wm_pid
+                    ) {
+                        if !title.is_empty() {
+                            handle_window_change(&storage, pid, &title, "Heartbeat");
+                        }
+                    }
+                    last_emit = std::time::Instant::now();
+                }
                 while XPending(display) > 0 {
                     let mut event: XEvent = std::mem::zeroed();
                     XNextEvent(display, &mut event);

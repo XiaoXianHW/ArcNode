@@ -13,11 +13,16 @@ func BearerAuth(token string) gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		header := c.GetHeader("Authorization")
-		if !strings.HasPrefix(header, "Bearer ") || strings.TrimPrefix(header, "Bearer ") != token {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		if header := c.GetHeader("Authorization"); strings.HasPrefix(header, "Bearer ") && strings.TrimPrefix(header, "Bearer ") == token {
+			c.Next()
 			return
 		}
-		c.Next()
+		// Browser <a href download> can't attach an Authorization header,
+		// so allow ?token=... as a fallback on GET requests.
+		if c.Request.Method == http.MethodGet && c.Query("token") == token {
+			c.Next()
+			return
+		}
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 	}
 }

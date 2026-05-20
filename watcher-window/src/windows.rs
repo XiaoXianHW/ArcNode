@@ -29,9 +29,20 @@ pub fn start_monitoring(device_id: String, storage: Arc<Storage>, running: Arc<A
     DEVICE_ID.set(device_id).ok();
     LAST_STATE.set(Mutex::new((String::new(), String::new(), 0))).ok();
     PROCESS_NAME_CACHE.set(Mutex::new(HashMap::new())).ok();
-    
+
     info!("Starting Windows window monitor");
-    
+
+    let heartbeat_running = running.clone();
+    thread::spawn(move || {
+        while heartbeat_running.load(Ordering::SeqCst) {
+            thread::sleep(Duration::from_secs(60));
+            if !heartbeat_running.load(Ordering::SeqCst) {
+                break;
+            }
+            emit_foreground_heartbeat();
+        }
+    });
+
     thread::spawn(move || {
         unsafe {
             let hook_foreground = SetWinEventHook(
@@ -118,6 +129,51 @@ unsafe extern "system" fn name_change_callback(
     handle_window_event(hwnd, "Title changed");
 }
 
+fn emit_foreground_heartbeat() {
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if hwnd.0 == 0 {
+            return;
+        }
+        let mut window_title = [0u16; 512];
+        let len = GetWindowTextW(hwnd, &mut window_title);
+        if len == 0 {
+            return;
+        }
+        let title = OsString::from_wide(&window_title[..len as usize])
+            .to_string_lossy()
+            .to_string();
+        let mut pid: u32 = 0;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        if pid == 0 {
+            return;
+        }
+        let process_name = get_process_name_cached(pid);
+        emit_foreground(process_name, title, pid, "Heartbeat");
+    }
+}
+
+fn emit_foreground(process_name: String, title: String, pid: u32, log_prefix: &str) {
+    let event = if let Some(device_id) = DEVICE_ID.get() {
+        TimelineEvent::new_legacy(
+            device_id.clone(),
+            EventType::ForegroundChange,
+            process_name.clone(),
+            Some(title.clone()),
+            pid,
+        )
+    } else {
+        return;
+    };
+    if let Some(storage) = STORAGE.get() {
+        if let Err(e) = storage.insert_event(&event) {
+            error!("Failed to insert event: {}", e);
+        } else {
+            info!("{}: {} - {}", log_prefix, process_name, title);
+        }
+    }
+}
+
 fn handle_window_event(hwnd: HWND, log_prefix: &str) {
     unsafe {
         if hwnd.0 == 0 {
@@ -151,25 +207,7 @@ fn handle_window_event(hwnd: HWND, log_prefix: &str) {
             }
         }
         
-        let event = if let Some(device_id) = DEVICE_ID.get() {
-            TimelineEvent::new_legacy(
-                device_id.clone(),
-                EventType::ForegroundChange,
-                process_name.clone(),
-                Some(title.clone()),
-                pid,
-            )
-        } else {
-            return;
-        };
-        
-        if let Some(storage) = STORAGE.get() {
-            if let Err(e) = storage.insert_event(&event) {
-                error!("Failed to insert event: {}", e);
-            } else {
-                info!("{}: {} - {}", log_prefix, process_name, title);
-            }
-        }
+        emit_foreground(process_name, title, pid, log_prefix);
     }
 }
 
