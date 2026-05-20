@@ -736,3 +736,12 @@ func (s *Server) handleEventCounts(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"counts": counts, "start": start, "end": end})
 }
+
+func (s *Server) handleReclassify(c *gin.Context) {
+	res, err := s.Store.ReclassifyAll(s.Classifier)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}
