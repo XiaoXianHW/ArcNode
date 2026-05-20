@@ -9,6 +9,7 @@ pub enum EventType {
     IdleStart,
     IdleEnd,
     KeyboardShortcut,
+    SystemSample,
 }
 
 impl EventType {
@@ -20,6 +21,7 @@ impl EventType {
             EventType::IdleStart => "idle_start",
             EventType::IdleEnd => "idle_end",
             EventType::KeyboardShortcut => "keyboard_shortcut",
+            EventType::SystemSample => "system_sample",
         }
     }
 }
