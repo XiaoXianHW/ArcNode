@@ -66,6 +66,9 @@ func (s *Server) Router() *gin.Engine {
 
 		api.GET("/export/segments.csv", s.handleExportSegmentsCSV)
 		api.GET("/export/events.json", s.handleExportEventsJSON)
+
+		api.GET("/debug/event-counts", s.handleEventCounts)
+		api.POST("/admin/reclassify", s.handleReclassify)
 	}
 
 	mcp := r.Group("/mcp")

@@ -3,6 +3,7 @@ package storage
 import (
 	"database/sql"
 	"strings"
+	"time"
 )
 
 type Segment struct {
@@ -271,10 +272,31 @@ func (s *Store) IdleStats(deviceID string, start, end int64) (IdleStat, error) {
 			idleStart = 0
 		}
 	}
-	if idleStart > 0 && end > idleStart {
-		out.IdleSeconds += end - idleStart
+	if err := rows.Err(); err != nil {
+		return out, err
 	}
-	total := end - start
+	// Bound the active window by the actual event range so an empty/early
+	// day doesn't report a full 24h of "active" time. The window is
+	// [first_event, min(last_event, end, now)].
+	firstTs, lastTs, errR := s.eventRange(deviceID, start, end)
+	if errR != nil {
+		return out, errR
+	}
+	if firstTs == 0 || lastTs == 0 {
+		return out, nil
+	}
+	now := time.Now().Unix()
+	upper := lastTs
+	if end < upper {
+		upper = end
+	}
+	if now < upper {
+		upper = now
+	}
+	if idleStart > 0 && upper > idleStart {
+		out.IdleSeconds += upper - idleStart
+	}
+	total := upper - firstTs
 	if total < 0 {
 		total = 0
 	}
@@ -282,5 +304,125 @@ func (s *Store) IdleStats(deviceID string, start, end int64) (IdleStat, error) {
 	if out.ActiveSeconds < 0 {
 		out.ActiveSeconds = 0
 	}
-	return out, rows.Err()
+	return out, nil
+}
+
+func (s *Store) eventRange(deviceID string, start, end int64) (int64, int64, error) {
+	var first, last sql.NullInt64
+	err := s.DB.QueryRow(`
+		SELECT MIN(timestamp), MAX(timestamp) FROM events
+		WHERE device_id=? AND timestamp BETWEEN ? AND ?
+	`, deviceID, start, end).Scan(&first, &last)
+	if err != nil {
+		return 0, 0, err
+	}
+	return first.Int64, last.Int64, nil
+}
+
+// Classifier is the minimal interface used by ReclassifyAll so the storage
+// package does not depend on category.
+type Classifier interface {
+	Classify(processName, windowTitle string) string
+}
+
+type ReclassifyResult struct {
+	SegmentsScanned int64 `json:"segments_scanned"`
+	SegmentsUpdated int64 `json:"segments_updated"`
+	EventsScanned   int64 `json:"events_scanned"`
+	EventsUpdated   int64 `json:"events_updated"`
+}
+
+// ReclassifyAll re-runs the classifier over stored segments and
+// foreground_change events, updating any row whose stored category no
+// longer matches what the classifier returns. Idle/shortcut/system rows
+// keep their assigned category untouched.
+func (s *Store) ReclassifyAll(cl Classifier) (ReclassifyResult, error) {
+	var out ReclassifyResult
+	if cl == nil {
+		return out, nil
+	}
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return out, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	rows, err := tx.Query(`SELECT id, IFNULL(process_name,''), IFNULL(window_title,''), IFNULL(category,'') FROM segments`)
+	if err != nil {
+		return out, err
+	}
+	type update struct {
+		id  int64
+		cat string
+	}
+	var segUpdates []update
+	for rows.Next() {
+		var id int64
+		var proc, title, cur string
+		if err := rows.Scan(&id, &proc, &title, &cur); err != nil {
+			rows.Close()
+			return out, err
+		}
+		out.SegmentsScanned++
+		next := cl.Classify(proc, title)
+		if next != cur {
+			segUpdates = append(segUpdates, update{id, next})
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return out, err
+	}
+	for _, u := range segUpdates {
+		var cat interface{}
+		if u.cat == "" {
+			cat = nil
+		} else {
+			cat = u.cat
+		}
+		if _, err := tx.Exec(`UPDATE segments SET category=? WHERE id=?`, cat, u.id); err != nil {
+			return out, err
+		}
+	}
+	out.SegmentsUpdated = int64(len(segUpdates))
+
+	rows, err = tx.Query(`SELECT id, IFNULL(process_name,''), IFNULL(window_title,''), IFNULL(category,'') FROM events WHERE event_type='foreground_change'`)
+	if err != nil {
+		return out, err
+	}
+	var evUpdates []update
+	for rows.Next() {
+		var id int64
+		var proc, title, cur string
+		if err := rows.Scan(&id, &proc, &title, &cur); err != nil {
+			rows.Close()
+			return out, err
+		}
+		out.EventsScanned++
+		next := cl.Classify(proc, title)
+		if next != cur {
+			evUpdates = append(evUpdates, update{id, next})
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return out, err
+	}
+	for _, u := range evUpdates {
+		var cat interface{}
+		if u.cat == "" {
+			cat = nil
+		} else {
+			cat = u.cat
+		}
+		if _, err := tx.Exec(`UPDATE events SET category=? WHERE id=?`, cat, u.id); err != nil {
+			return out, err
+		}
+	}
+	out.EventsUpdated = int64(len(evUpdates))
+
+	if err := tx.Commit(); err != nil {
+		return out, err
+	}
+	return out, nil
 }
