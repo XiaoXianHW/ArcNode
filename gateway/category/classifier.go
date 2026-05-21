@@ -59,6 +59,14 @@ func New(rules map[string]Rules) *Classifier {
 // This guards against the classic title-hijack false positives such as
 // Chrome with a window title containing the word "Minecraft" being
 // classified as gaming.
+//
+// Process-name matching uses word-boundary semantics: a bare alphanumeric
+// keyword (e.g. "ro") must match a full token in the process name (split
+// on '.', '_', '-', '/', '\', whitespace). Keywords containing any non
+// alphanumeric character (e.g. "chrome.exe", "google chrome") still use
+// substring match so multi-word patterns and explicit ".exe" entries
+// continue to work. This stops short game abbreviations like "ro" from
+// mis-matching "chrome.exe" or "explorer.exe".
 func (c *Classifier) Classify(processName, windowTitle string) string {
 	if c == nil {
 		return ""
@@ -68,11 +76,14 @@ func (c *Classifier) Classify(processName, windowTitle string) string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
+	procTokens := tokenize(proc)
+	titleTokens := tokenize(title)
+
 	procCat := ""
 	if proc != "" {
 		for _, cat := range c.order {
 			for _, k := range c.merged[cat].Process {
-				if k != "" && strings.Contains(proc, k) {
+				if keywordMatches(proc, procTokens, k) {
 					procCat = cat
 					break
 				}
@@ -87,7 +98,7 @@ func (c *Classifier) Classify(processName, windowTitle string) string {
 	if title != "" {
 		for _, cat := range c.order {
 			for _, k := range c.merged[cat].Title {
-				if k != "" && strings.Contains(title, k) {
+				if keywordMatches(title, titleTokens, k) {
 					titleCat = cat
 					break
 				}
@@ -105,6 +116,54 @@ func (c *Classifier) Classify(processName, windowTitle string) string {
 		return titleCat
 	}
 	return procCat
+}
+
+// keywordMatches applies word-boundary semantics for bare alphanumeric
+// keywords and substring semantics for anything containing separators.
+func keywordMatches(haystack string, tokens map[string]struct{}, kw string) bool {
+	if kw == "" {
+		return false
+	}
+	if isAlnumOnly(kw) {
+		_, ok := tokens[kw]
+		return ok
+	}
+	return strings.Contains(haystack, kw)
+}
+
+func isAlnumOnly(s string) bool {
+	for _, r := range s {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'z') {
+			return false
+		}
+	}
+	return s != ""
+}
+
+// tokenize splits the input on common separators and returns a set of
+// non-empty tokens. The result is suitable for word-boundary matching.
+func tokenize(s string) map[string]struct{} {
+	if s == "" {
+		return nil
+	}
+	out := map[string]struct{}{}
+	cur := make([]byte, 0, len(s))
+	flush := func() {
+		if len(cur) > 0 {
+			out[string(cur)] = struct{}{}
+			cur = cur[:0]
+		}
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') {
+			cur = append(cur, c)
+		} else {
+			flush()
+		}
+	}
+	flush()
+	return out
 }
 
 // Rules returns a deep copy of the active merged rule set keyed by category.

@@ -31,6 +31,13 @@ func main() {
 		classifier.SetCustom(custom)
 	}
 
+	if res, err := store.ReclassifyAll(classifier); err != nil {
+		log.Printf("reclassify on startup failed: %v", err)
+	} else if res.SegmentsUpdated > 0 || res.EventsUpdated > 0 {
+		log.Printf("reclassify: segments %d/%d, events %d/%d updated",
+			res.SegmentsUpdated, res.SegmentsScanned, res.EventsUpdated, res.EventsScanned)
+	}
+
 	server := &api.Server{
 		Store:      store,
 		Classifier: classifier,

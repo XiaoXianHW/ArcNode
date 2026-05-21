@@ -369,20 +369,21 @@ export const api = {
     request<WeeklyReport>(`/stats/weekly-report${qs(params)}`),
 };
 
-export function exportSegmentsCSVURL(params: { device_id?: string; date?: string; category?: string; start?: number; end?: number }): string {
+function exportURL(path: string, params: Record<string, unknown>): string {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== '' && v !== null) search.set(k, String(v));
   });
+  const token = getToken();
+  if (token) search.set('token', token);
   const s = search.toString();
-  return `/api/v1/export/segments.csv${s ? `?${s}` : ''}`;
+  return `${path}${s ? `?${s}` : ''}`;
+}
+
+export function exportSegmentsCSVURL(params: { device_id?: string; date?: string; category?: string; start?: number; end?: number }): string {
+  return exportURL('/api/v1/export/segments.csv', params);
 }
 
 export function exportEventsJSONURL(params: { device_id?: string; start?: number; end?: number; type?: string; limit?: number }): string {
-  const search = new URLSearchParams();
-  Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== '' && v !== null) search.set(k, String(v));
-  });
-  const s = search.toString();
-  return `/api/v1/export/events.json${s ? `?${s}` : ''}`;
+  return exportURL('/api/v1/export/events.json', params);
 }
