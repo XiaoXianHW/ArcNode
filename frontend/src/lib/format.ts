@@ -37,9 +37,35 @@ export function formatDate(ts: number): string {
 }
 
 export function todayISO(): string {
-  const d = new Date();
+  return toISODate(new Date());
+}
+
+export function toISODate(d: Date): string {
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
+}
+
+// ISO date (YYYY-MM-DD) → unix seconds at local 00:00:00
+export function startOfDayUnix(iso: string): number {
+  return Math.floor(new Date(`${iso}T00:00:00`).getTime() / 1000);
+}
+
+// ISO date (YYYY-MM-DD) → unix seconds at local 23:59:59
+export function endOfDayUnix(iso: string): number {
+  return Math.floor(new Date(`${iso}T23:59:59`).getTime() / 1000);
+}
+
+// Returns the ISO date `n` days before today (n=0 → today).
+export function daysAgoISO(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return toISODate(d);
+}
+
+// Inclusive number of days covered by an ISO date range.
+export function rangeDays(start: string, end: string): number {
+  const ms = new Date(`${end}T00:00:00`).getTime() - new Date(`${start}T00:00:00`).getTime();
+  return Math.max(1, Math.round(ms / 86400000) + 1);
 }

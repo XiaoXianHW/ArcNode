@@ -53,6 +53,13 @@ const en: Dict = {
 
   'devicebar.noDevices': 'No devices',
   'devicebar.lastSeen': 'last seen',
+  'devicebar.allDevices': 'All devices (merged)',
+  'devicebar.mergedCount': 'Merged · {n} devices',
+  'range.today': 'Today',
+  'range.7d': '7 days',
+  'range.30d': '30 days',
+  'range.start': 'Start date',
+  'range.end': 'End date',
 
   'dashboard.title': 'Overview',
   'dashboard.subtitle': 'Daily activity for {date}',
@@ -76,6 +83,8 @@ const en: Dict = {
   'timeline.hourGridSub': 'Each row is one hour of the day',
   'timeline.segments': 'Segments',
   'timeline.segmentsSub': '{n} segments',
+  'timeline.devices': 'Devices in view',
+  'timeline.devicesSub': 'Color legend for merged devices',
 
   'categories.title': 'Categories',
   'categories.subtitle': 'Time spent by category for {date}',
@@ -325,6 +334,13 @@ const zh: Dict = {
 
   'devicebar.noDevices': '暂无设备',
   'devicebar.lastSeen': '最近活跃',
+  'devicebar.allDevices': '全部设备（合并）',
+  'devicebar.mergedCount': '合并 · {n} 台设备',
+  'range.today': '今天',
+  'range.7d': '7 天',
+  'range.30d': '30 天',
+  'range.start': '开始日期',
+  'range.end': '结束日期',
 
   'dashboard.title': '概览',
   'dashboard.subtitle': '{date} 的日常活动',
@@ -348,6 +364,8 @@ const zh: Dict = {
   'timeline.hourGridSub': '每行代表一小时',
   'timeline.segments': '片段',
   'timeline.segmentsSub': '共 {n} 段',
+  'timeline.devices': '视图内设备',
+  'timeline.devicesSub': '合并设备的颜色图例',
 
   'categories.title': '分类',
   'categories.subtitle': '{date} 各分类时长',

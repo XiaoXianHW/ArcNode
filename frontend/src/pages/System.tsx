@@ -18,12 +18,18 @@ import { formatTime } from '../lib/format';
 import { useChartTokens } from '../lib/chartTokens';
 
 export function System() {
-  const { selectedId } = useDeviceContext();
+  const { selectedId, startUnix, endUnix, days } = useDeviceContext();
   const { t } = useI18n();
   const tokens = useChartTokens();
 
-  const samples = useAsync(() => api.getSystem({ device_id: selectedId, days: 3 }), [selectedId]);
-  const pairs = useAsync(() => api.getAppPairs({ device_id: selectedId, days: 7, limit: 20 }), [selectedId]);
+  const samples = useAsync(
+    () => api.getSystem({ device_id: selectedId, start: startUnix, end: endUnix }),
+    [selectedId, startUnix, endUnix],
+  );
+  const pairs = useAsync(
+    () => api.getAppPairs({ device_id: selectedId, days, limit: 20 }),
+    [selectedId, days],
+  );
 
   const series = useMemo(() => {
     const list = samples.data?.samples ?? [];
