@@ -3,6 +3,7 @@ use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
+use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::config::StorageConfig;
@@ -86,7 +87,50 @@ impl RemoteStorage {
             error!("Failed to initialize device: {}", e);
         }
         
+        storage.spawn_background_flusher();
+        
         Ok(storage)
+    }
+    
+    // Periodically drains and ships the buffer so low-frequency events (e.g.
+    // system samples on an otherwise idle machine) are delivered reliably and
+    // are never left stranded between insert_event calls.
+    fn spawn_background_flusher(&self) {
+        let buffer = self.buffer.clone();
+        let last_flush = self.last_flush.clone();
+        let client = self.client.clone();
+        let url = self.gateway_url.clone();
+        let token = self.token.clone();
+        let device_id = self.device_id.clone();
+        let interval = self.max_flush_interval;
+        thread::spawn(move || loop {
+            thread::sleep(interval);
+            let events: Vec<TimelineEvent> = {
+                let mut buf = match buffer.lock() {
+                    Ok(b) => b,
+                    Err(_) => continue,
+                };
+                if buf.is_empty() {
+                    continue;
+                }
+                buf.drain(..).collect()
+            };
+            match Self::post_batch(&client, &url, &token, &device_id, events.clone()) {
+                Ok(_) => {
+                    if let Ok(mut last) = last_flush.lock() {
+                        *last = Instant::now();
+                    }
+                }
+                Err(e) => {
+                    error!("Background flush failed, re-queueing {} events: {}", events.len(), e);
+                    if let Ok(mut buf) = buffer.lock() {
+                        for ev in events.into_iter().rev() {
+                            buf.push_front(ev);
+                        }
+                    }
+                }
+            }
+        });
     }
     
     fn init_device(&self) -> Result<()> {
@@ -160,15 +204,26 @@ impl RemoteStorage {
     }
     
     fn send_batch(&self, events: Vec<TimelineEvent>) -> Result<()> {
+        Self::post_batch(&self.client, &self.gateway_url, &self.token, &self.device_id, events)
+    }
+    
+    fn post_batch(
+        client: &reqwest::blocking::Client,
+        gateway_url: &str,
+        token: &str,
+        device_id: &str,
+        events: Vec<TimelineEvent>,
+    ) -> Result<()> {
+        let count = events.len();
         let batch = EventBatch {
-            device_id: self.device_id.clone(),
+            device_id: device_id.to_string(),
             events,
         };
         
-        let url = format!("{}/api/v1/events", self.gateway_url);
-        let response = self.client
+        let url = format!("{}/api/v1/events", gateway_url);
+        let response = client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Authorization", format!("Bearer {}", token))
             .json(&batch)
             .send()?;
         
@@ -177,7 +232,7 @@ impl RemoteStorage {
             return Err(anyhow::anyhow!("Gateway error: {}", error_text));
         }
         
-        info!("Sent {} events to gateway", batch.events.len());
+        info!("Sent {} events to gateway", count);
         Ok(())
     }
 }

@@ -354,7 +354,7 @@ ArcNode/
 
 ## Roadmap
 
-- [ ] **agent-android** — Kotlin foreground service polling `UsageStatsManager`
+- [x] **agent-android** — Kotlin foreground service polling `UsageStatsManager` (see [`android/`](android/))
 - [ ] **agent-ios** — Shortcuts / Screen Time integration
 - [ ] **Browser extension** — domain-level breakdown for Chrome / Firefox
 - [ ] **Local LLM RAG** — `ask("what did I do Wednesday afternoon?")` via on-device model
