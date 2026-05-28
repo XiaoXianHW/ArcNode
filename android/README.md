@@ -33,6 +33,10 @@ Or just open the `android/` folder in Android Studio.
 4. Tap **Start tracking**. A persistent notification confirms the service is
    running; the device then shows up in the gateway like any desktop agent.
 
+The bottom **Logs** panel shows live status — device init result, detected
+foreground apps, and each report's event count / HTTP status — so you can
+confirm connectivity without adb.
+
 ## Notes
 
 - `PACKAGE_USAGE_STATS` is a special access permission and must be granted from

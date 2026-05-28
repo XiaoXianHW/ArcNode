@@ -1,6 +1,5 @@
 package ai.arcnode.agent
 
-import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -53,14 +52,15 @@ class GatewayClient(
             conn.outputStream.use { it.write(json.toByteArray()) }
             val code = conn.responseCode
             if (code in 200..299) {
+                Logbook.log("POST $path -> $code OK")
                 true
             } else {
                 val err = conn.errorStream?.bufferedReader()?.use(BufferedReader::readText)
-                Log.w(TAG, "POST $path failed: $code $err")
+                Logbook.log("POST $path -> $code FAIL ${err.orEmpty().take(120)}")
                 false
             }
         } catch (e: Exception) {
-            Log.w(TAG, "POST $path error: ${e.message}")
+            Logbook.log("POST $path error: ${e.message}")
             false
         } finally {
             conn?.disconnect()
@@ -68,8 +68,6 @@ class GatewayClient(
     }
 
     companion object {
-        private const val TAG = "ArcNodeGateway"
-
         /** Build a TimelineEvent matching the gateway's expected JSON shape. */
         fun event(
             deviceId: String,

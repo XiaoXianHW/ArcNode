@@ -18,4 +18,6 @@
     <string name="usage_missing">Usage access: not granted (tap below)</string>
     <string name="channel_name">ArcNode tracking</string>
     <string name="notif_text">Reporting activity to the gateway</string>
+    <string name="logs">Logs</string>
+    <string name="clear_logs">Clear</string>
 </resources>

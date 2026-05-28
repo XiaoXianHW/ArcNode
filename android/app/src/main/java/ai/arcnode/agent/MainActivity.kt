@@ -7,8 +7,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.Process
 import android.provider.Settings
+import android.text.method.ScrollingMovementMethod
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -18,6 +21,14 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var prefs: Prefs
+
+    private val handler = Handler(Looper.getMainLooper())
+    private val refreshLogs = object : Runnable {
+        override fun run() {
+            renderLogs()
+            handler.postDelayed(this, 1000)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,6 +50,11 @@ class MainActivity : AppCompatActivity() {
             TrackingService.stop(this)
             toast(getString(R.string.stopped))
         }
+        binding.logView.movementMethod = ScrollingMovementMethod()
+        binding.clearLogButton.setOnClickListener {
+            Logbook.clear()
+            renderLogs()
+        }
     }
 
     override fun onResume() {
@@ -46,6 +62,22 @@ class MainActivity : AppCompatActivity() {
         binding.usageStatus.text = getString(
             if (hasUsageAccess()) R.string.usage_granted else R.string.usage_missing,
         )
+        handler.post(refreshLogs)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        handler.removeCallbacks(refreshLogs)
+    }
+
+    private fun renderLogs() {
+        val text = Logbook.snapshot()
+        if (text != binding.logView.text.toString()) {
+            binding.logView.text = text
+            val layout = binding.logView.layout ?: return
+            val scrollTo = layout.getLineBottom(binding.logView.lineCount - 1) - binding.logView.height
+            binding.logView.scrollTo(0, scrollTo.coerceAtLeast(0))
+        }
     }
 
     private fun save() {
@@ -59,6 +91,7 @@ class MainActivity : AppCompatActivity() {
         prefs.token = token
         prefs.deviceName = binding.deviceName.text.toString().trim()
         prefs.sampleIntervalSecs = binding.interval.text.toString().toIntOrNull() ?: 60
+        Logbook.log("Settings saved -> $url")
         toast(getString(R.string.saved))
     }
 
@@ -68,11 +101,13 @@ class MainActivity : AppCompatActivity() {
             return
         }
         if (!hasUsageAccess()) {
+            Logbook.log("Usage access not granted — opening settings")
             toast(getString(R.string.usage_missing))
             startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
             return
         }
         requestNotificationPermissionIfNeeded()
+        Logbook.log("Starting tracking service…")
         TrackingService.start(this)
         toast(getString(R.string.started))
     }

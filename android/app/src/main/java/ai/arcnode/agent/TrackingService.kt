@@ -53,7 +53,9 @@ class TrackingService : Service() {
 
     private fun runLoop() {
         val deviceName = prefs.deviceName.ifEmpty { Build.MODEL ?: "android-device" }
-        client.initDevice(deviceName, "android", systemInfo())
+        Logbook.log("Service started · ${prefs.sampleIntervalSecs}s · -> ${prefs.gatewayUrl}")
+        val initOk = client.initDevice(deviceName, "android", systemInfo())
+        Logbook.log(if (initOk) "Device init OK ($deviceName)" else "Device init FAILED — check URL/token")
 
         var lastPackage = ""
         var lastQuery = System.currentTimeMillis() - 60_000L
@@ -67,6 +69,7 @@ class TrackingService : Service() {
             lastQuery = now
             if (fg != null && fg != lastPackage) {
                 lastPackage = fg
+                Logbook.log("Foreground: ${appLabel(fg)} ($fg)")
                 batch += GatewayClient.event(
                     deviceId = prefs.deviceId,
                     eventType = "ForegroundChange",
@@ -79,15 +82,21 @@ class TrackingService : Service() {
                 )
             }
 
+            val sample = systemSample()
             batch += GatewayClient.event(
                 deviceId = prefs.deviceId,
                 eventType = "SystemSample",
                 timestamp = now / 1000,
                 category = null,
-                metadata = systemSample(),
+                metadata = sample,
             )
 
-            client.sendEvents(batch)
+            val battery = if (sample.has("battery_pct")) "${sample.getInt("battery_pct")}%" else "n/a"
+            val ok = client.sendEvents(batch)
+            Logbook.log(
+                "${if (ok) "Reported" else "Report FAILED"}: ${batch.size} events " +
+                    "(mem ${"%.0f".format(sample.optDouble("memory", 0.0))}%, batt $battery)",
+            )
 
             try {
                 Thread.sleep(intervalMs)
@@ -95,6 +104,7 @@ class TrackingService : Service() {
                 break
             }
         }
+        Logbook.log("Service stopped")
     }
 
     /** Most recent package moved to foreground within [from, to). */
