@@ -29,6 +29,24 @@ export const CHART_PALETTE = [
   '#525252',
 ];
 
+const DEVICE_PALETTE = [
+  '#60a5fa',
+  '#34d399',
+  '#fbbf24',
+  '#f472b6',
+  '#a78bfa',
+  '#ff6b6b',
+  '#22d3ee',
+  '#facc15',
+];
+
+// Stable color for a device id, used when merging multiple devices.
+export function deviceColor(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return DEVICE_PALETTE[hash % DEVICE_PALETTE.length];
+}
+
 export const LANGUAGE_COLORS: Record<string, string> = {
   Go: '#00ADD8',
   Rust: '#dea584',

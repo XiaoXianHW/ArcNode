@@ -27,11 +27,18 @@ const DEFAULT_CATS = [
 ];
 
 export function Categories() {
-  const { selectedId, date } = useDeviceContext();
+  const { selectedId, range, startUnix, endUnix } = useDeviceContext();
   const { t } = useI18n();
   const tokens = useChartTokens();
-  const cats = useAsync(() => api.getCategories({ device_id: selectedId, date }), [selectedId, date]);
-  const apps = useAsync(() => api.getApps({ device_id: selectedId, date, limit: 50 }), [selectedId, date]);
+  const rangeLabel = range.start === range.end ? range.start : `${range.start} → ${range.end}`;
+  const cats = useAsync(
+    () => api.getCategories({ device_id: selectedId, start: startUnix, end: endUnix }),
+    [selectedId, startUnix, endUnix],
+  );
+  const apps = useAsync(
+    () => api.getApps({ device_id: selectedId, start: startUnix, end: endUnix, limit: 50 }),
+    [selectedId, startUnix, endUnix],
+  );
   const [filter, setFilter] = useState<string>('');
   const [customRefresh, setCustomRefresh] = useState(0);
   const customKw = useAsync(() => api.listCustomKeywords(), [customRefresh]);
@@ -54,7 +61,7 @@ export function Categories() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">{t('categories.title')}</h1>
-        <p className="text-sm text-muted mt-1">{t('categories.subtitle', { date })}</p>
+        <p className="text-sm text-muted mt-1">{t('categories.subtitle', { date: rangeLabel })}</p>
       </header>
 
       <Card title={t('categories.breakdown')} subtitle={t('categories.breakdownSub', { value: formatDuration(total) })}>

@@ -6,11 +6,11 @@ import { api } from '../lib/api';
 import { useAsync } from '../hooks/useAsync';
 
 export function Shortcuts() {
-  const { selectedId, date } = useDeviceContext();
+  const { selectedId, startUnix, endUnix } = useDeviceContext();
   const { t } = useI18n();
   const { data, loading, error } = useAsync(
-    () => api.getShortcuts({ device_id: selectedId, date, limit: 100 }),
-    [selectedId, date],
+    () => api.getShortcuts({ device_id: selectedId, start: startUnix, end: endUnix, limit: 100 }),
+    [selectedId, startUnix, endUnix],
   );
 
   if (loading) return <p className="text-sm text-muted">{t('common.loading')}</p>;

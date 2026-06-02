@@ -5,31 +5,68 @@ import { useDeviceContext } from '../state/deviceContext';
 import { useI18n } from '../state/i18nContext';
 import { api, Segment } from '../lib/api';
 import { useAsync } from '../hooks/useAsync';
-import { formatDuration, formatTime } from '../lib/format';
-import { categoryColor } from '../lib/colors';
+import { formatDuration, formatTime, formatDate, toISODate } from '../lib/format';
+import { categoryColor, deviceColor } from '../lib/colors';
 
 export function Timeline() {
-  const { selectedId, date } = useDeviceContext();
+  const { selectedId, isMerged, devices, range, startUnix, endUnix } = useDeviceContext();
   const { t } = useI18n();
   const { data, loading, error } = useAsync(
-    () => api.getSegments({ device_id: selectedId, date }),
-    [selectedId, date],
+    () => api.getSegments({ device_id: selectedId, start: startUnix, end: endUnix }),
+    [selectedId, startUnix, endUnix],
   );
+
+  const deviceName = useMemo(() => {
+    const m: Record<string, string> = {};
+    devices.forEach((d) => (m[d.device_id] = d.name || d.device_id.slice(0, 8)));
+    return (id: string) => m[id] ?? id.slice(0, 8);
+  }, [devices]);
+
+  const segments = data?.segments ?? [];
+  const rangeLabel = range.start === range.end ? range.start : `${range.start} → ${range.end}`;
+  const multiDay = range.start !== range.end;
+
+  // Group by local day for the multi-day view (hook must run unconditionally).
+  const days = useMemoDays(segments, range.start, range.end);
 
   if (loading) return <Skeleton />;
   if (error) return <ErrorState error={error} />;
-
-  const segments = data?.segments ?? [];
 
   return (
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">{t('timeline.title')}</h1>
-        <p className="text-sm text-muted mt-1">{t('timeline.subtitle', { date })}</p>
+        <p className="text-sm text-muted mt-1">{t('timeline.subtitle', { date: rangeLabel })}</p>
       </header>
 
+      {isMerged && segments.length > 0 && (
+        <Card title={t('timeline.devices')} subtitle={t('timeline.devicesSub')}>
+          <div className="flex flex-wrap gap-3">
+            {Array.from(new Set(segments.map((s) => s.device_id))).map((id) => (
+              <span key={id} className="inline-flex items-center gap-2 text-sm">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: deviceColor(id) }} />
+                {deviceName(id)}
+              </span>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <Card title={t('timeline.hourGrid')} subtitle={t('timeline.hourGridSub')}>
-        {segments.length === 0 ? <Empty /> : <HourGrid segments={segments} date={date} />}
+        {segments.length === 0 ? (
+          <Empty />
+        ) : multiDay ? (
+          <div className="space-y-4">
+            {days.map((d) => (
+              <div key={d.iso}>
+                <p className="text-xs text-muted mb-1 font-mono">{d.iso}</p>
+                <HourGrid segments={d.segments} date={d.iso} colorBy={isMerged ? 'device' : 'category'} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <HourGrid segments={segments} date={range.start} colorBy={isMerged ? 'device' : 'category'} />
+        )}
       </Card>
 
       <Card title={t('timeline.segments')} subtitle={t('timeline.segmentsSub', { n: segments.length })}>
@@ -40,11 +77,13 @@ export function Timeline() {
             <table className="w-full table">
               <thead>
                 <tr>
-                  <th className="py-2 px-3">Time</th>
-                  <th className="py-2 px-3">App</th>
-                  <th className="py-2 px-3">Title</th>
-                  <th className="py-2 px-3">Category</th>
-                  <th className="py-2 px-3 text-right">Duration</th>
+                  <th className="py-2 px-3">{t('common.time')}</th>
+                  {multiDay && <th className="py-2 px-3">{t('common.date')}</th>}
+                  {isMerged && <th className="py-2 px-3">{t('nav.devices')}</th>}
+                  <th className="py-2 px-3">{t('common.app')}</th>
+                  <th className="py-2 px-3">{t('common.title')}</th>
+                  <th className="py-2 px-3">{t('common.category')}</th>
+                  <th className="py-2 px-3 text-right">{t('common.duration')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -53,6 +92,20 @@ export function Timeline() {
                     <td className="py-2 px-3 font-mono text-xs text-muted">
                       {formatTime(s.start_time)} – {formatTime(s.end_time)}
                     </td>
+                    {multiDay && (
+                      <td className="py-2 px-3 font-mono text-xs text-muted">{formatDate(s.start_time)}</td>
+                    )}
+                    {isMerged && (
+                      <td className="py-2 px-3">
+                        <span className="inline-flex items-center gap-1.5">
+                          <span
+                            className="h-2 w-2 rounded-full"
+                            style={{ background: deviceColor(s.device_id) }}
+                          />
+                          <span className="text-xs text-fg/80">{deviceName(s.device_id)}</span>
+                        </span>
+                      </td>
+                    )}
                     <td className="py-2 px-3">{s.process_name}</td>
                     <td className="py-2 px-3 text-fg/70 truncate max-w-[280px]" title={s.window_title}>
                       {s.window_title || '—'}
@@ -74,7 +127,34 @@ export function Timeline() {
   );
 }
 
-function HourGrid({ segments, date }: { segments: Segment[]; date: string }) {
+function useMemoDays(segments: Segment[], start: string, end: string) {
+  return useMemo(() => {
+    const out: { iso: string; segments: Segment[] }[] = [];
+    const cur = new Date(`${start}T00:00:00`);
+    const last = new Date(`${end}T00:00:00`);
+    while (cur <= last) {
+      const iso = toISODate(cur);
+      const dayStart = Math.floor(new Date(`${iso}T00:00:00`).getTime() / 1000);
+      const dayEnd = dayStart + 24 * 3600;
+      out.push({
+        iso,
+        segments: segments.filter((s) => s.end_time > dayStart && s.start_time < dayEnd),
+      });
+      cur.setDate(cur.getDate() + 1);
+    }
+    return out.filter((d) => d.segments.length > 0);
+  }, [segments, start, end]);
+}
+
+function HourGrid({
+  segments,
+  date,
+  colorBy,
+}: {
+  segments: Segment[];
+  date: string;
+  colorBy: 'category' | 'device';
+}) {
   const dayStart = useMemo(() => Math.floor(new Date(date + 'T00:00:00').getTime() / 1000), [date]);
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
@@ -93,6 +173,9 @@ function HourGrid({ segments, date }: { segments: Segment[]; date: string }) {
     });
     return buckets;
   }, [segments, dayStart]);
+
+  const segColor = (s: Segment) =>
+    colorBy === 'device' ? deviceColor(s.device_id) : categoryColor(s.category || 'uncategorized');
 
   return (
     <div className="space-y-1">
@@ -118,7 +201,7 @@ function HourGrid({ segments, date }: { segments: Segment[]; date: string }) {
                     style={{
                       left: `${left}%`,
                       width: `${Math.max(width, 0.5)}%`,
-                      background: categoryColor(s.category || 'uncategorized'),
+                      background: segColor(s),
                     }}
                   />
                 );
