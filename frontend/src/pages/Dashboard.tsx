@@ -11,11 +11,12 @@ import { categoryColor } from '../lib/colors';
 import { useChartTokens } from '../lib/chartTokens';
 
 export function Dashboard() {
-  const { selectedId, date } = useDeviceContext();
+  const { selectedId, range, startUnix, endUnix } = useDeviceContext();
   const { t } = useI18n();
+  const rangeLabel = range.start === range.end ? range.start : `${range.start} → ${range.end}`;
   const { data, loading, error } = useAsync(
-    () => api.getSummary({ device_id: selectedId, date }),
-    [selectedId, date],
+    () => api.getSummary({ device_id: selectedId, start: startUnix, end: endUnix }),
+    [selectedId, startUnix, endUnix],
   );
 
   const totalActive = data?.idle?.active_seconds ?? 0;
@@ -36,7 +37,7 @@ export function Dashboard() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">{t('dashboard.title')}</h1>
-        <p className="text-sm text-muted mt-1">{t('dashboard.subtitle', { date })}</p>
+        <p className="text-sm text-muted mt-1">{t('dashboard.subtitle', { date: rangeLabel })}</p>
       </header>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -46,23 +47,23 @@ export function Dashboard() {
         <Card>
           <Stat
             label={t('dashboard.topCategory')}
-            value={data.categories[0]?.category ?? '—'}
-            sub={data.categories[0] ? formatDuration(data.categories[0].duration) : undefined}
+            value={data.categories?.[0]?.category ?? '—'}
+            sub={data.categories?.[0] ? formatDuration(data.categories[0].duration) : undefined}
           />
         </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card title={t('dashboard.categories')} subtitle={t('dashboard.categoriesSub')} className="lg:col-span-1">
-          <CategoryDonut data={data.categories} />
+          <CategoryDonut data={data.categories ?? []} />
         </Card>
 
         <Card title={t('dashboard.topApps')} subtitle={t('dashboard.topAppsSub')} className="lg:col-span-2">
-          {data.top_apps.length === 0 ? (
+          {(data.top_apps ?? []).length === 0 ? (
             <Empty message={t('dashboard.noActivity')} />
           ) : (
             <ul className="space-y-2">
-              {data.top_apps.map((app) => (
+              {(data.top_apps ?? []).map((app) => (
                 <li key={app.process_name} className="flex items-center gap-3">
                   <span
                     className="h-2 w-2 rounded-full"
@@ -83,11 +84,11 @@ export function Dashboard() {
       </div>
 
       <Card title={t('dashboard.topShortcuts')} subtitle={t('dashboard.topShortcutsSub')}>
-        {data.shortcuts.length === 0 ? (
+        {(data.shortcuts ?? []).length === 0 ? (
           <Empty message={t('dashboard.noActivity')} />
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-            {data.shortcuts.map((sc, i) => (
+            {(data.shortcuts ?? []).map((sc, i) => (
               <div key={`${sc.shortcut}-${i}`} className="rounded-md border border-border bg-elevated p-3">
                 <p className="font-mono text-sm text-fg">{sc.shortcut}</p>
                 <p className="text-xs text-muted mt-1 truncate" title={sc.application}>

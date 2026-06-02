@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ArcNode Agent</string>
+    <string name="subtitle">Report foreground app &amp; resources to your gateway</string>
+    <string name="hint_url">Gateway URL (e.g. http://192.168.1.10:8080)</string>
+    <string name="hint_token">Bearer token</string>
+    <string name="hint_name">Device name</string>
+    <string name="hint_interval">Sample interval (seconds)</string>
+    <string name="save">Save settings</string>
+    <string name="grant_usage">Grant usage access</string>
+    <string name="start">Start tracking</string>
+    <string name="stop">Stop tracking</string>
+    <string name="saved">Settings saved</string>
+    <string name="started">Tracking started</string>
+    <string name="stopped">Tracking stopped</string>
+    <string name="need_url_token">Gateway URL and token are required</string>
+    <string name="usage_granted">Usage access: granted</string>
+    <string name="usage_missing">Usage access: not granted (tap below)</string>
+    <string name="channel_name">ArcNode tracking</string>
+    <string name="notif_text">Reporting activity to the gateway</string>
+    <string name="logs">Logs</string>
+    <string name="clear_logs">Clear</string>
+</resources>

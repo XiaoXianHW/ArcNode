@@ -29,7 +29,7 @@ pub fn start_monitoring(device_id: String, storage: Arc<Storage>, running: Arc<A
                 let pool = NSAutoreleasePool::new(nil);
                 
                 let workspace: id = msg_send![class!(NSWorkspace), sharedWorkspace];
-                let frontmost_app: id = msg_send![workspace, frontMostApplication];
+                let frontmost_app: id = msg_send![workspace, frontmostApplication];
                 
                 if frontmost_app != nil {
                     let app_name: id = msg_send![frontmost_app, localizedName];
@@ -89,7 +89,7 @@ unsafe fn nsstring_to_string(ns_string: id) -> String {
 
 unsafe fn get_frontmost_window_title() -> String {
     let workspace: id = msg_send![class!(NSWorkspace), sharedWorkspace];
-    let frontmost_app: id = msg_send![workspace, frontMostApplication];
+    let frontmost_app: id = msg_send![workspace, frontmostApplication];
     
     if frontmost_app == nil {
         return String::new();

@@ -132,12 +132,37 @@ func (s *Server) handleSummary(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	if cats == nil {
+		cats = []storage.CategoryStat{}
+	}
+	if apps == nil {
+		apps = []storage.AppStat{}
+	}
+	if shortcuts == nil {
+		shortcuts = []storage.ShortcutStat{}
+	}
 	idle := storage.IdleStat{}
 	if deviceID != "" {
 		idle, err = s.Store.IdleStats(deviceID, start, end)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
+		}
+	} else {
+		// Merged view: aggregate idle/active across every device.
+		devices, derr := s.Store.ListDevices()
+		if derr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": derr.Error()})
+			return
+		}
+		for _, d := range devices {
+			ds, ierr := s.Store.IdleStats(d.DeviceID, start, end)
+			if ierr != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": ierr.Error()})
+				return
+			}
+			idle.IdleSeconds += ds.IdleSeconds
+			idle.ActiveSeconds += ds.ActiveSeconds
 		}
 	}
 	c.JSON(http.StatusOK, gin.H{

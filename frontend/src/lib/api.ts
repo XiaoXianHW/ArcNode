@@ -301,15 +301,15 @@ function qs(params: Record<string, string | number | undefined>): string {
 
 export const api = {
   listDevices: () => request<{ devices: Device[] }>('/devices'),
-  getSummary: (params: { device_id?: string; date?: string }) =>
+  getSummary: (params: { device_id?: string; date?: string; start?: number; end?: number }) =>
     request<Summary>(`/stats/summary${qs(params)}`),
-  getCategories: (params: { device_id?: string; date?: string }) =>
+  getCategories: (params: { device_id?: string; date?: string; start?: number; end?: number }) =>
     request<{ categories: CategoryStat[]; start: number; end: number }>(`/stats/categories${qs(params)}`),
-  getApps: (params: { device_id?: string; date?: string; limit?: number }) =>
+  getApps: (params: { device_id?: string; date?: string; start?: number; end?: number; limit?: number }) =>
     request<{ apps: AppStat[]; start: number; end: number }>(`/stats/apps${qs(params)}`),
-  getShortcuts: (params: { device_id?: string; date?: string; limit?: number }) =>
+  getShortcuts: (params: { device_id?: string; date?: string; start?: number; end?: number; limit?: number }) =>
     request<{ shortcuts: ShortcutStat[]; start: number; end: number }>(`/stats/shortcuts${qs(params)}`),
-  getSegments: (params: { device_id?: string; date?: string; category?: string }) =>
+  getSegments: (params: { device_id?: string; date?: string; start?: number; end?: number; category?: string }) =>
     request<{ segments: Segment[] }>(`/segments${qs(params)}`),
   getEvents: (params: {
     device_id?: string;
@@ -324,7 +324,7 @@ export const api = {
     request<{ days: DailyBucket[]; start: number; end: number }>(`/stats/daily${qs(params)}`),
   getHeatmap: (params: { device_id?: string; category?: string; days?: number; end?: number }) =>
     request<Heatmap>(`/stats/heatmap${qs(params)}`),
-  getProjects: (params: { device_id?: string; category?: string; date?: string; limit?: number }) =>
+  getProjects: (params: { device_id?: string; category?: string; date?: string; start?: number; end?: number; limit?: number }) =>
     request<{ projects: ProjectStat[] }>(`/stats/projects${qs(params)}`),
   getLanguages: (params: { device_id?: string; days?: number; end?: number }) =>
     request<{ languages: LanguageStat[]; start: number; end: number }>(`/stats/languages${qs(params)}`),
@@ -360,7 +360,7 @@ export const api = {
     request<{ days: SedentaryDay[]; threshold: number; start: number; end: number }>(`/stats/sedentary${qs(params)}`),
   getSuggestions: (params: { device_id?: string; days?: number; limit?: number }) =>
     request<{ items: UncategorizedRow[]; start: number; end: number }>(`/stats/suggestions${qs(params)}`),
-  getSystem: (params: { device_id?: string; days?: number }) =>
+  getSystem: (params: { device_id?: string; days?: number; start?: number; end?: number }) =>
     request<{ samples: SystemSample[]; start: number; end: number }>(`/stats/system${qs(params)}`),
   getGames: (params: { device_id?: string; days?: number }) =>
     request<{ games: GameReport[]; start: number; end: number }>(`/stats/games${qs(params)}`),

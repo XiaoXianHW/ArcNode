@@ -435,7 +435,14 @@ func (s *Server) handleSuggestions(c *gin.Context) {
 }
 
 func (s *Server) handleSystemSamples(c *gin.Context) {
-	start, end := windowedRange(c, 1)
+	// Prefer explicit start/end (or date) range; fall back to a windowed
+	// lookback when only `days` is supplied.
+	var start, end int64
+	if c.Query("start") != "" || c.Query("date") != "" {
+		start, end = dateRange(c)
+	} else {
+		start, end = windowedRange(c, 3)
+	}
 	samples, err := s.Store.SystemSamples(c.Query("device_id"), start, end)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
