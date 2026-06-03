@@ -28,6 +28,9 @@ impl EventType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimelineEvent {
+    /// Client-generated unique id. Lets the gateway deduplicate events that are
+    /// re-sent after a retry/restart so the same activity is never stored twice.
+    pub event_id: String,
     pub device_id: String,
     pub timestamp: i64,
     pub event_type: EventType,
@@ -40,6 +43,7 @@ pub struct TimelineEvent {
 impl TimelineEvent {
     pub fn new(device_id: String, event_type: EventType) -> Self {
         Self {
+            event_id: new_event_id(),
             device_id,
             timestamp: chrono::Utc::now().timestamp(),
             event_type,
@@ -73,6 +77,7 @@ impl TimelineEvent {
         metadata.insert("pid".to_string(), Value::Number(serde_json::Number::from(pid)));
         
         Self {
+            event_id: new_event_id(),
             device_id,
             timestamp: chrono::Utc::now().timestamp(),
             event_type,
@@ -90,6 +95,7 @@ impl TimelineEvent {
         metadata.insert("count".to_string(), Value::Number(serde_json::Number::from(1)));
         
         Self {
+            event_id: new_event_id(),
             device_id,
             timestamp: chrono::Utc::now().timestamp(),
             event_type: EventType::KeyboardShortcut,
@@ -100,6 +106,7 @@ impl TimelineEvent {
 
     pub fn idle(device_id: String, event_type: EventType) -> Self {
         Self {
+            event_id: new_event_id(),
             device_id,
             timestamp: chrono::Utc::now().timestamp(),
             event_type,
@@ -129,4 +136,8 @@ impl TimelineEvent {
             .as_u64()
             .map(|n| n as u32)
     }
+}
+
+fn new_event_id() -> String {
+    uuid::Uuid::new_v4().to_string()
 }

@@ -14,12 +14,16 @@ import (
 // as process keywords for backward compatibility, while v2 supports
 // `[categories.<name>.process]` and `[categories.<name>.title]`.
 type Config struct {
-	Listen            string                     `toml:"listen"`
-	Token             string                     `toml:"token"`
-	DBPath            string                     `toml:"db_path"`
-	SegmentGapSeconds int64                      `toml:"segment_gap_seconds"`
-	Categories        map[string][]string        `toml:"categories"`
-	CategoryRules     map[string]CategoryRuleCfg `toml:"category_rules"`
+	Listen            string `toml:"listen"`
+	Token             string `toml:"token"`
+	DBPath            string `toml:"db_path"`
+	SegmentGapSeconds int64  `toml:"segment_gap_seconds"`
+	// RetentionDays controls how long raw events/segments are kept. 0 (the
+	// default) keeps data forever; a positive value enables a daily prune of
+	// rows older than the cutoff to bound the database size.
+	RetentionDays int64                      `toml:"retention_days"`
+	Categories    map[string][]string        `toml:"categories"`
+	CategoryRules map[string]CategoryRuleCfg `toml:"category_rules"`
 }
 
 // CategoryRuleCfg is the v2 user-facing split schema.
