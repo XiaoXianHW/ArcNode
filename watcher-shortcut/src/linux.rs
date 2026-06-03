@@ -305,10 +305,8 @@ pub fn start_monitoring(device_id: String, storage: Arc<Storage>, running: Arc<A
         let context_value = context;
         let record_thread = thread::spawn(move || {
             let rd = record_display_addr as *mut Display;
-            unsafe {
-                XRecordEnableContext(rd, context_value, Some(event_callback), ptr::null_mut());
-                XCloseDisplay(rd);
-            }
+            XRecordEnableContext(rd, context_value, Some(event_callback), ptr::null_mut());
+            XCloseDisplay(rd);
         });
         
         while running.load(Ordering::SeqCst) {

@@ -54,12 +54,6 @@ jobs:
             goos: linux
             goarch: arm64
             archive_ext: tar.gz
-          - target: macos-amd64
-            runner: macos-13
-            rust_target: x86_64-apple-darwin
-            goos: darwin
-            goarch: amd64
-            archive_ext: tar.gz
           - target: macos-arm64
             runner: macos-latest
             rust_target: aarch64-apple-darwin
