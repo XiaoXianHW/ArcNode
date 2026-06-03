@@ -28,7 +28,7 @@ Everything runs locally. No cloud. No telemetry. No analytics SaaS in the loop.
 ┌────────────┐   /api/v1/events    ┌────────────┐    /api/*     ┌──────────────┐
 │  agent     │ ──────────────────▶ │  gateway   │ ────────────▶ │  frontend    │
 │  (Rust)    │   bearer + batch    │  (Go +     │   bearer      │  (React)     │
-│  arcowo    │                     │   SQLite)  │               │  embedded    │
+│  arcnode   │                     │   SQLite)  │               │  embedded    │
 └────────────┘                     └────────────┘               └──────────────┘
    one per                            single                       served by
    device                             binary                       gateway
@@ -88,7 +88,7 @@ The gateway exposes a single `/mcp` JSON-RPC endpoint with **27 tools** so any M
 
 ### 1. Pre-built binaries
 
-Grab the latest `arcnode-<platform>-<arch>.zip` (or `.tar.gz`) from the [Releases page](https://github.com/XiaoXianHW/ArcNode/releases) — each archive contains both `arcowo-gateway` (server + embedded frontend) and `arcowo` (agent), with example configs and SHA256 checksums.
+Grab the latest `arcnode-<platform>-<arch>.zip` (or `.tar.gz`) from the [Releases page](https://github.com/XiaoXianHW/ArcNode/releases) — each archive contains both `arcnode-gateway` (server + embedded frontend) and `arcnode-agent` (agent), with example configs and SHA256 checksums.
 
 CI also publishes per-commit binaries on every push to main — see the [Actions tab](https://github.com/XiaoXianHW/ArcNode/actions/workflows/ci.yml).
 
@@ -97,7 +97,7 @@ CI also publishes per-commit binaries on every push to main — see the [Actions
 ```bash
 cp gateway/config.example.toml gateway/config.toml
 # edit the token, listen address, db path...
-./arcowo-gateway --config gateway/config.toml
+./arcnode-gateway --config gateway/config.toml
 ```
 
 The frontend is embedded in the binary — open `http://localhost:8080` in any browser.
@@ -105,9 +105,9 @@ The frontend is embedded in the binary — open `http://localhost:8080` in any b
 ### 3. Run an agent
 
 ```bash
-./arcowo init-config        # writes config.toml with a UUID + hostname
+./arcnode-agent init-config  # writes config.toml with a UUID + hostname
 # edit [storage] to point at your gateway
-./arcowo                    # starts monitoring + uploading
+./arcnode-agent              # starts monitoring + uploading
 ```
 
 ### 4. Connect an AI client (optional)
@@ -120,12 +120,12 @@ Point Claude / Cursor / Continue at `https://<gateway>/mcp` with `Authorization:
 
 ```bash
 # Single binary (frontend embedded into gateway)
-make build           # → ./arcowo-gateway
+make build           # → ./arcnode-gateway
 
 # Or component-by-component:
 (cd frontend && npm install && npm run build)   # outputs to gateway/web/dist/
-(cd gateway  && go build -o ../arcowo-gateway .)
-cargo build --workspace --release               # → target/release/arcowo
+(cd gateway  && go build -o ../arcnode-gateway .)
+cargo build --workspace --release               # → target/release/arcnode-agent
 ```
 
 Requirements: **Go 1.23+**, **Node 22+**, **Rust 1.95+**. Cross-platform release archives are produced by `.github/workflows/release.yml` for Linux/macOS/Windows × amd64/arm64.
@@ -314,7 +314,7 @@ Then ask: *"Using arcnode, summarize last week — top languages, longest focus 
 ```
 ArcNode/
 ├── core/              # Rust shared lib — events, db, storage, sysinfo, config
-├── app/               # Rust CLI (arcowo) — default monitor / export / init-config
+├── app/               # Rust CLI (arcnode-agent) — default monitor / export / init-config
 ├── watcher-window/    # foreground window watcher (per-OS impl)
 ├── watcher-process/   # process lifecycle watcher
 ├── watcher-idle/      # idle detection
@@ -407,8 +407,8 @@ ArcNode 是一个**完全本地、自托管的个人电脑活动时间线**：�
 
 1. 从 [Releases](https://github.com/XiaoXianHW/ArcNode/releases) 下载对应平台的压缩包
 2. `cp gateway/config.example.toml gateway/config.toml` 改 token / 端口 / db 路径
-3. `./arcowo-gateway --config gateway/config.toml` 启动网关，访问 `http://localhost:8080`
-4. `./arcowo init-config` 生成 Agent 配置，把 `[storage]` 切到远端网关并运行 `./arcowo`
+3. `./arcnode-gateway --config gateway/config.toml` 启动网关，访问 `http://localhost:8080`
+4. `./arcnode-agent init-config` 生成 Agent 配置，把 `[storage]` 切到远端网关并运行 `./arcnode-agent`
 5. AI 客户端可指向 `https://<gateway>/mcp`，Header `Authorization: Bearer <token>`
 
 详细 API / MCP / 架构请看上方英文部分对应章节。

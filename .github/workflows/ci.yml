@@ -62,12 +62,12 @@ jobs:
         working-directory: gateway
       - name: build release binary
         working-directory: gateway
-        run: go build -trimpath -ldflags="-s -w" -o arcowo-gateway${{ matrix.ext }} .
+        run: go build -trimpath -ldflags="-s -w" -o arcnode-gateway${{ matrix.ext }} .
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: |
-            gateway/arcowo-gateway${{ matrix.ext }}
+            gateway/arcnode-gateway${{ matrix.ext }}
             gateway/config.example.toml
           retention-days: 14
 
@@ -105,6 +105,6 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: |
-            target/release/arcowo${{ matrix.ext }}
+            target/release/arcnode-agent${{ matrix.ext }}
             config.example.toml
           retention-days: 14

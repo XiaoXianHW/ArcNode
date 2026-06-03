@@ -30,7 +30,7 @@ frontend/dist/
 frontend/**/*.tsbuildinfo
 
 # Gateway build output
-arcowo-gateway
+arcnode-gateway
 gateway/gateway
 gateway/gateway.db
 gateway/gateway.db-*
