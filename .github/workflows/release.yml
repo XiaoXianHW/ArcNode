@@ -109,8 +109,8 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: |
           set -e
-          OUT="arcowo-gateway"
-          if [ "$GOOS" = "windows" ]; then OUT="arcowo-gateway.exe"; fi
+          OUT="arcnode-gateway"
+          if [ "$GOOS" = "windows" ]; then OUT="arcnode-gateway.exe"; fi
           go build -trimpath -ldflags "-s -w" -o "$OUT" .
 
       - name: build agent
@@ -128,11 +128,11 @@ jobs:
           name="arcnode-${TAG}-${{ matrix.target }}"
           mkdir -p "dist/$name"
           if [ "${{ matrix.goos }}" = "windows" ]; then
-            cp gateway/arcowo-gateway.exe "dist/$name/"
-            cp "target/${{ matrix.rust_target }}/release/arcowo.exe" "dist/$name/"
+            cp gateway/arcnode-gateway.exe "dist/$name/"
+            cp "target/${{ matrix.rust_target }}/release/arcnode-agent.exe" "dist/$name/"
           else
-            cp gateway/arcowo-gateway "dist/$name/"
-            cp "target/${{ matrix.rust_target }}/release/arcowo" "dist/$name/"
+            cp gateway/arcnode-gateway "dist/$name/"
+            cp "target/${{ matrix.rust_target }}/release/arcnode-agent" "dist/$name/"
           fi
           cp config.example.toml "dist/$name/agent.example.toml"
           cp gateway/config.example.toml "dist/$name/gateway.example.toml" 2>/dev/null || true
