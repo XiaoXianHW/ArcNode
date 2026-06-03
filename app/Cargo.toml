@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [[bin]]
-name = "arcowo"
+name = "arcnode-agent"
 path = "src/main.rs"
 
 [dependencies]
