@@ -8,8 +8,10 @@ import (
 
 type Event struct {
 	ID          int64                  `json:"id,omitempty"`
+	EventID     string                 `json:"event_id,omitempty"`
 	DeviceID    string                 `json:"device_id"`
 	Timestamp   int64                  `json:"timestamp"`
+	ReceivedAt  int64                  `json:"received_at,omitempty"`
 	EventType   string                 `json:"event_type"`
 	Category    string                 `json:"category,omitempty"`
 	ProcessName string                 `json:"process_name,omitempty"`
@@ -28,12 +30,16 @@ type EventQuery struct {
 	Offset    int
 }
 
-func (s *Store) InsertEvent(tx *sql.Tx, e *Event) (int64, error) {
+// InsertEvent stores an event, deduplicating on event_id. It reports whether a
+// new row was actually inserted (false means the event_id was already present
+// and the insert was ignored), so callers can avoid double-counting derived
+// state such as timeline segments when an agent re-sends a batch.
+func (s *Store) InsertEvent(tx *sql.Tx, e *Event) (inserted bool, err error) {
 	var meta sql.NullString
 	if len(e.Metadata) > 0 {
 		b, err := json.Marshal(e.Metadata)
 		if err != nil {
-			return 0, err
+			return false, err
 		}
 		meta = sql.NullString{String: string(b), Valid: true}
 	}
@@ -41,15 +47,23 @@ func (s *Store) InsertEvent(tx *sql.Tx, e *Event) (int64, error) {
 	if e.PID > 0 {
 		pid = sql.NullInt64{Int64: int64(e.PID), Valid: true}
 	}
+	var receivedAt sql.NullInt64
+	if e.ReceivedAt > 0 {
+		receivedAt = sql.NullInt64{Int64: e.ReceivedAt, Valid: true}
+	}
 	res, err := tx.Exec(`
-		INSERT INTO events (device_id, timestamp, event_type, category, process_name, window_title, pid, metadata)
-		VALUES (?,?,?,?,?,?,?,?)
-	`, e.DeviceID, e.Timestamp, e.EventType, nullable(e.Category),
+		INSERT OR IGNORE INTO events (event_id, device_id, timestamp, received_at, event_type, category, process_name, window_title, pid, metadata)
+		VALUES (?,?,?,?,?,?,?,?,?,?)
+	`, nullable(e.EventID), e.DeviceID, e.Timestamp, receivedAt, e.EventType, nullable(e.Category),
 		nullable(e.ProcessName), nullable(e.WindowTitle), pid, meta)
 	if err != nil {
-		return 0, err
+		return false, err
 	}
-	return res.LastInsertId()
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
 }
 
 func (s *Store) QueryEvents(q EventQuery) ([]Event, error) {

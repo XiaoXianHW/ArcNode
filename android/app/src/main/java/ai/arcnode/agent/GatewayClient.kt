@@ -5,6 +5,7 @@ import org.json.JSONObject
 import java.io.BufferedReader
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.UUID
 
 /**
  * Minimal HTTP client that mirrors the Rust agent's contract with the gateway:
@@ -77,6 +78,7 @@ class GatewayClient(
             metadata: JSONObject,
         ): JSONObject {
             val obj = JSONObject()
+                .put("event_id", UUID.randomUUID().toString())
                 .put("device_id", deviceId)
                 .put("timestamp", timestamp)
                 .put("event_type", eventType)

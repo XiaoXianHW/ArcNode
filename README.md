@@ -174,6 +174,7 @@ listen              = ":8080"
 token               = "change-me-to-a-secure-token"
 db_path             = "./gateway.db"
 segment_gap_seconds = 60         # foreground events <this collapse into one segment
+retention_days      = 0          # 0 = keep forever; >0 prunes + VACUUMs older data daily
 
 [categories]
 coding   = ["code", "cursor", "intellij", "vim", ...]

@@ -27,21 +27,22 @@
 - [ ] 网关侧设备元数据更新（last_seen、平台、配置）健壮化
 
 **B. 摄取正确性（多设备并发）**
-- [ ] 批量事件端点校验：字段必填、类型、时间戳范围、单批上限
-- [ ] **幂等/去重**：客户端生成 `event_id`（或 device_id+ts+seq），重发不重复入库
-- [ ] 事件顺序与时钟偏移处理（用服务端接收时间兜底 + 保留客户端时间）
-- [ ] 部分失败处理：批中坏事件不拖垮整批，返回明确错误
+- [x] 批量事件端点校验：未知事件类型剔除（计入 `invalid`）、单批上限 `maxBatchEvents=50000`（超限 413）
+- [x] **幂等/去重**：客户端（Rust agent + Android）生成 `event_id`；网关 `INSERT OR IGNORE` + `event_id` 局部唯一索引，重发不重复入库；衍生 segment 不重复累计
+- [x] 时钟偏移处理：服务端 `received_at` 接收时间兜底；客户端时间领先 >5min 视为偏移钳制到接收时间；其余保留客户端时间（便于补传保真）
+- [x] 部分失败处理：坏事件跳过不拖垮整批；返回 `{inserted, duplicates, invalid}`
 
 **C. 可靠传输（agent 端）**
-- [ ] **本地持久化重试队列**：离线/网关宕机时事件落盘，恢复后补传（agent 重启不丢）
-- [ ] 退避重连 + 上限，避免风暴
-- [ ] （已做的后台 flush + 失败重入队 在此基础上固化）
+- [x] **本地持久化重试队列**：失败事件落盘到 spool（NDJSON，`ARCNODE_SPOOL` 可配），重启自动补传；配合 `event_id` 重放安全不重复
+- [x] 退避重连：指数退避（2s→×2→封顶 60s），避免风暴
+- [x] 后台 flusher 统一所有网络发送（buffer + spool 合并、按序补传），修复原同步路径发送失败丢事件的缺陷
+- [x] spool 容量上限 `SPOOL_MAX_EVENTS=50000`（丢最旧、有日志），临时文件+rename 防写半截损坏
 
 **D. 存储与查询**
-- [ ] SQLite 调优复查：WAL、busy_timeout、`SetMaxOpenConns(1)` 对并发写的影响评估
-- [ ] 索引复查（device_id+timestamp 已有；补 event_type/category 组合查询）
-- [ ] **数据保留/清理**：可配置 retention，定时 prune + VACUUM，控制库体积
-- [ ] 多设备合并查询正确性回归（已实现的 merged summary / timeline 加测试）
+- [x] events 表新增 `event_id`/`received_at` 列（旧库 best-effort ALTER 兼容）
+- [x] 索引：`event_id` 局部唯一索引（去重）；既有 device_id+timestamp / event_type / category 索引复查保留
+- [x] **数据保留/清理**：`retention_days` 可配置，启动即清 + 每 24h 定时 prune（events/segments）+ VACUUM
+- [x] dedup / 保留 / 时钟偏移单测（gateway `event_test.go`、agent spool 单测）；多设备合并查询已在 PR #7 实现
 
 ---
 

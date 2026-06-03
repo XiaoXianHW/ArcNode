@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"log"
+	"time"
 
 	"github.com/XiaoXianHW/ArcNode/gateway/api"
 	"github.com/XiaoXianHW/ArcNode/gateway/category"
@@ -10,6 +11,37 @@ import (
 	"github.com/XiaoXianHW/ArcNode/gateway/storage"
 	"github.com/XiaoXianHW/ArcNode/gateway/web"
 )
+
+// startRetention launches a background loop that, when a positive retention
+// window is configured, prunes events/segments older than the cutoff on
+// startup and then once a day, reclaiming space afterwards.
+func startRetention(store *storage.Store, retentionDays int64) {
+	if retentionDays <= 0 {
+		return
+	}
+	prune := func() {
+		cutoff := time.Now().AddDate(0, 0, int(-retentionDays)).Unix()
+		ev, seg, err := store.PruneOlderThan(cutoff)
+		if err != nil {
+			log.Printf("retention prune failed: %v", err)
+			return
+		}
+		if ev > 0 || seg > 0 {
+			log.Printf("retention prune: removed %d events, %d segments older than %d days", ev, seg, retentionDays)
+			if err := store.Vacuum(); err != nil {
+				log.Printf("retention vacuum failed: %v", err)
+			}
+		}
+	}
+	go func() {
+		prune()
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			prune()
+		}
+	}()
+}
 
 func main() {
 	configPath := flag.String("config", "config.toml", "path to config file")
@@ -37,6 +69,8 @@ func main() {
 		log.Printf("reclassify: segments %d/%d, events %d/%d updated",
 			res.SegmentsUpdated, res.SegmentsScanned, res.EventsUpdated, res.EventsScanned)
 	}
+
+	startRetention(store, cfg.RetentionDays)
 
 	server := &api.Server{
 		Store:      store,
