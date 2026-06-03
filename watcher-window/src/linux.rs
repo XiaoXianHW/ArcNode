@@ -4,6 +4,7 @@ use log::{info, error};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::ffi::CStr;
+use std::os::raw::c_char;
 use std::ptr;
 use std::thread;
 use std::time::Duration;
@@ -25,11 +26,11 @@ pub fn start_monitoring(device_id: String, storage: Arc<Storage>, running: Arc<A
             }
             
             let root = XDefaultRootWindow(display);
-            let net_active_window = XInternAtom(display, b"_NET_ACTIVE_WINDOW\0".as_ptr() as *const i8, 0);
-            let net_wm_name = XInternAtom(display, b"_NET_WM_NAME\0".as_ptr() as *const i8, 0);
-            let wm_name = XInternAtom(display, b"WM_NAME\0".as_ptr() as *const i8, 0);
-            let utf8_string = XInternAtom(display, b"UTF8_STRING\0".as_ptr() as *const i8, 0);
-            let net_wm_pid = XInternAtom(display, b"_NET_WM_PID\0".as_ptr() as *const i8, 0);
+            let net_active_window = XInternAtom(display, b"_NET_ACTIVE_WINDOW\0".as_ptr() as *const c_char, 0);
+            let net_wm_name = XInternAtom(display, b"_NET_WM_NAME\0".as_ptr() as *const c_char, 0);
+            let wm_name = XInternAtom(display, b"WM_NAME\0".as_ptr() as *const c_char, 0);
+            let utf8_string = XInternAtom(display, b"UTF8_STRING\0".as_ptr() as *const c_char, 0);
+            let net_wm_pid = XInternAtom(display, b"_NET_WM_PID\0".as_ptr() as *const c_char, 0);
             
             XSelectInput(display, root, PropertyChangeMask);
             
@@ -169,7 +170,7 @@ unsafe fn get_window_info(
         &mut bytes_after,
         &mut prop,
     ) == 0 && !prop.is_null() {
-        let c_str = CStr::from_ptr(prop as *const i8);
+        let c_str = CStr::from_ptr(prop as *const c_char);
         title = c_str.to_string_lossy().to_string();
         XFree(prop as *mut _);
     }
