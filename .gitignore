@@ -37,3 +37,7 @@ gateway/gateway.db-*
 gateway/config.toml
 gateway/web/dist/*
 !gateway/web/dist/.gitkeep
+
+# Agent local retry spool (offline buffer)
+.arcnode-spool.jsonl
+.arcnode-spool.jsonl.tmp

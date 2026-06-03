@@ -1,7 +1,9 @@
 use anyhow::Result;
-use log::{error, info};
+use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
+use std::fs;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -19,6 +21,99 @@ pub struct EventBatch {
 pub trait StorageBackend: Send + Sync {
     fn insert_event(&self, event: &TimelineEvent) -> Result<()>;
     fn flush(&self) -> Result<()>;
+}
+
+/// Upper bound on how many events we keep spooled on disk while the gateway is
+/// unreachable. Older events beyond this are dropped to keep disk usage bounded.
+const SPOOL_MAX_EVENTS: usize = 50_000;
+
+/// Disk-backed overflow queue for events that could not be delivered to the
+/// gateway. Persisted as newline-delimited JSON so undelivered activity
+/// survives an agent crash or restart and is replayed once the gateway is back.
+/// Combined with the per-event `event_id`, replaying is safe: the gateway
+/// deduplicates, so re-sending never double-counts.
+struct Spool {
+    path: PathBuf,
+}
+
+impl Spool {
+    fn new(path: PathBuf) -> Self {
+        Self { path }
+    }
+
+    fn load(&self) -> Vec<TimelineEvent> {
+        let data = match fs::read_to_string(&self.path) {
+            Ok(d) => d,
+            Err(_) => return Vec::new(),
+        };
+        data.lines()
+            .filter(|l| !l.trim().is_empty())
+            .filter_map(|l| serde_json::from_str::<TimelineEvent>(l).ok())
+            .collect()
+    }
+
+    fn replace(&self, events: &[TimelineEvent]) {
+        if events.is_empty() {
+            self.clear();
+            return;
+        }
+        let start = events.len().saturating_sub(SPOOL_MAX_EVENTS);
+        let dropped = start;
+        if dropped > 0 {
+            warn!("spool over {} events, dropping {} oldest", SPOOL_MAX_EVENTS, dropped);
+        }
+        let mut out = String::new();
+        for e in &events[start..] {
+            if let Ok(s) = serde_json::to_string(e) {
+                out.push_str(&s);
+                out.push('\n');
+            }
+        }
+        // Write to a temp file then rename so a crash mid-write can't corrupt
+        // the spool.
+        let tmp = self.path.with_extension("jsonl.tmp");
+        if fs::write(&tmp, out.as_bytes()).is_ok() {
+            let _ = fs::rename(&tmp, &self.path);
+        }
+    }
+
+    fn clear(&self) {
+        let _ = fs::remove_file(&self.path);
+    }
+}
+
+fn spool_path() -> PathBuf {
+    if let Ok(p) = std::env::var("ARCNODE_SPOOL") {
+        return PathBuf::from(p);
+    }
+    PathBuf::from(".arcnode-spool.jsonl")
+}
+
+/// Decides whether the in-memory buffer should be drained and shipped now,
+/// trading latency for batching efficiency.
+fn should_flush(
+    buffer_len: usize,
+    batch_size: usize,
+    last_flush: &Arc<Mutex<Instant>>,
+    last_event_time: &Arc<Mutex<Instant>>,
+    min_flush_interval: Duration,
+    max_flush_interval: Duration,
+) -> bool {
+    if buffer_len == 0 {
+        return false;
+    }
+    if buffer_len >= batch_size {
+        return true;
+    }
+    let last_flush_elapsed = last_flush.lock().map(|l| l.elapsed()).unwrap_or_default();
+    let last_event_elapsed = last_event_time.lock().map(|l| l.elapsed()).unwrap_or_default();
+    if buffer_len <= 5 && last_event_elapsed >= Duration::from_millis(500) {
+        return true;
+    }
+    if last_flush_elapsed >= min_flush_interval {
+        return true;
+    }
+    last_flush_elapsed >= max_flush_interval
 }
 
 pub struct LocalStorage {
@@ -55,6 +150,7 @@ pub struct RemoteStorage {
     last_flush: Arc<Mutex<Instant>>,
     last_event_time: Arc<Mutex<Instant>>,
     client: reqwest::blocking::Client,
+    spool: Arc<Mutex<Spool>>,
 }
 
 impl RemoteStorage {
@@ -81,10 +177,18 @@ impl RemoteStorage {
             last_flush: Arc::new(Mutex::new(now)),
             last_event_time: Arc::new(Mutex::new(now)),
             client,
+            spool: Arc::new(Mutex::new(Spool::new(spool_path()))),
         };
         
         if let Err(e) = storage.init_device() {
             error!("Failed to initialize device: {}", e);
+        }
+
+        if let Ok(s) = storage.spool.lock() {
+            let pending = s.load();
+            if !pending.is_empty() {
+                info!("recovered {} spooled events from previous run", pending.len());
+            }
         }
         
         storage.spawn_background_flusher();
@@ -92,41 +196,77 @@ impl RemoteStorage {
         Ok(storage)
     }
     
-    // Periodically drains and ships the buffer so low-frequency events (e.g.
-    // system samples on an otherwise idle machine) are delivered reliably and
-    // are never left stranded between insert_event calls.
+    // Owns all network delivery. Every ~1s it considers the in-memory buffer
+    // plus anything previously spooled to disk, ships them as one batch, and on
+    // failure persists the undelivered events to disk and backs off
+    // exponentially. Low-frequency events (e.g. system samples on an otherwise
+    // idle machine) are therefore never stranded, and a crash/restart or an
+    // offline gateway never loses data.
     fn spawn_background_flusher(&self) {
         let buffer = self.buffer.clone();
         let last_flush = self.last_flush.clone();
+        let last_event_time = self.last_event_time.clone();
         let client = self.client.clone();
         let url = self.gateway_url.clone();
         let token = self.token.clone();
         let device_id = self.device_id.clone();
-        let interval = self.max_flush_interval;
-        thread::spawn(move || loop {
-            thread::sleep(interval);
-            let events: Vec<TimelineEvent> = {
-                let mut buf = match buffer.lock() {
-                    Ok(b) => b,
-                    Err(_) => continue,
-                };
-                if buf.is_empty() {
+        let spool = self.spool.clone();
+        let batch_size = self.batch_size;
+        let min_flush = self.min_flush_interval;
+        let max_flush = self.max_flush_interval;
+        let tick = Duration::from_secs(1);
+        let max_backoff = Duration::from_secs(60);
+        thread::spawn(move || {
+            let mut backoff = Duration::ZERO;
+            loop {
+                thread::sleep(tick + backoff);
+
+                let spooled: Vec<TimelineEvent> =
+                    spool.lock().map(|s| s.load()).unwrap_or_default();
+                let buf_len = buffer.lock().map(|b| b.len()).unwrap_or(0);
+
+                let due = !spooled.is_empty()
+                    || should_flush(buf_len, batch_size, &last_flush, &last_event_time, min_flush, max_flush);
+                if !due {
+                    backoff = Duration::ZERO;
                     continue;
                 }
-                buf.drain(..).collect()
-            };
-            match Self::post_batch(&client, &url, &token, &device_id, events.clone()) {
-                Ok(_) => {
-                    if let Ok(mut last) = last_flush.lock() {
-                        *last = Instant::now();
-                    }
+
+                // Spooled (older) events first, then the live buffer, so order
+                // is preserved across a reconnect.
+                let mut events = spooled;
+                if let Ok(mut buf) = buffer.lock() {
+                    events.extend(buf.drain(..));
                 }
-                Err(e) => {
-                    error!("Background flush failed, re-queueing {} events: {}", events.len(), e);
-                    if let Ok(mut buf) = buffer.lock() {
-                        for ev in events.into_iter().rev() {
-                            buf.push_front(ev);
+                if events.is_empty() {
+                    backoff = Duration::ZERO;
+                    continue;
+                }
+
+                match Self::post_batch(&client, &url, &token, &device_id, events.clone()) {
+                    Ok(_) => {
+                        if let Ok(s) = spool.lock() {
+                            s.clear();
                         }
+                        if let Ok(mut last) = last_flush.lock() {
+                            *last = Instant::now();
+                        }
+                        backoff = Duration::ZERO;
+                    }
+                    Err(e) => {
+                        error!(
+                            "flush failed, spooling {} events to disk: {}",
+                            events.len(),
+                            e
+                        );
+                        if let Ok(s) = spool.lock() {
+                            s.replace(&events);
+                        }
+                        backoff = if backoff.is_zero() {
+                            Duration::from_secs(2)
+                        } else {
+                            (backoff * 2).min(max_backoff)
+                        };
                     }
                 }
             }
@@ -171,38 +311,6 @@ impl RemoteStorage {
         Ok(())
     }
     
-    fn should_flush(&self, buffer_len: usize) -> bool {
-        if buffer_len == 0 {
-            return false;
-        }
-        
-        if buffer_len >= self.batch_size {
-            return true;
-        }
-        
-        let last_flush_elapsed = self.last_flush.lock()
-            .map(|last| last.elapsed())
-            .unwrap_or(Duration::from_secs(0));
-        
-        let last_event_elapsed = self.last_event_time.lock()
-            .map(|last| last.elapsed())
-            .unwrap_or(Duration::from_secs(0));
-        
-        if buffer_len <= 5 && last_event_elapsed >= Duration::from_millis(500) {
-            return true;
-        }
-        
-        if last_flush_elapsed >= self.min_flush_interval && buffer_len > 0 {
-            return true;
-        }
-        
-        if last_flush_elapsed >= self.max_flush_interval {
-            return true;
-        }
-        
-        false
-    }
-    
     fn send_batch(&self, events: Vec<TimelineEvent>) -> Result<()> {
         Self::post_batch(&self.client, &self.gateway_url, &self.token, &self.device_id, events)
     }
@@ -238,48 +346,49 @@ impl RemoteStorage {
 }
 
 impl StorageBackend for RemoteStorage {
+    // Buffering only; the background flusher owns delivery, spooling, and
+    // backoff. This keeps the hot path (event capture) lock-light and never
+    // blocks watchers on network I/O.
     fn insert_event(&self, event: &TimelineEvent) -> Result<()> {
-        let mut buffer = self.buffer.lock().unwrap();
-        buffer.push_back(event.clone());
-        
+        if let Ok(mut buffer) = self.buffer.lock() {
+            buffer.push_back(event.clone());
+        }
         if let Ok(mut last_event) = self.last_event_time.lock() {
             *last_event = Instant::now();
         }
-        
-        let buffer_len = buffer.len();
-        if self.should_flush(buffer_len) {
-            let events: Vec<_> = buffer.drain(..).collect();
-            drop(buffer);
-            
-            if let Err(e) = self.send_batch(events) {
-                error!("Failed to send batch: {}", e);
-                return Err(e);
-            }
-            
-            if let Ok(mut last) = self.last_flush.lock() {
-                *last = Instant::now();
-            }
-        }
-        
         Ok(())
     }
     
+    // Best-effort synchronous drain (used on shutdown): combine the disk spool
+    // and the in-memory buffer, try once, and on failure persist everything
+    // back to the spool so it is replayed on next launch.
     fn flush(&self) -> Result<()> {
-        let mut buffer = self.buffer.lock().unwrap();
-        if buffer.is_empty() {
+        let mut events: Vec<TimelineEvent> =
+            self.spool.lock().map(|s| s.load()).unwrap_or_default();
+        if let Ok(mut buffer) = self.buffer.lock() {
+            events.extend(buffer.drain(..));
+        }
+        if events.is_empty() {
             return Ok(());
         }
-        
-        let events: Vec<_> = buffer.drain(..).collect();
-        drop(buffer);
-        
-        self.send_batch(events)?;
-        
-        if let Ok(mut last) = self.last_flush.lock() {
-            *last = Instant::now();
+
+        match self.send_batch(events.clone()) {
+            Ok(_) => {
+                if let Ok(s) = self.spool.lock() {
+                    s.clear();
+                }
+                if let Ok(mut last) = self.last_flush.lock() {
+                    *last = Instant::now();
+                }
+                Ok(())
+            }
+            Err(e) => {
+                if let Ok(s) = self.spool.lock() {
+                    s.replace(&events);
+                }
+                Err(e)
+            }
         }
-        
-        Ok(())
     }
 }
 
@@ -340,5 +449,51 @@ impl StorageBackend for ClonableBackend {
     
     fn flush(&self) -> Result<()> {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::events::EventType;
+
+    fn sample(n: usize) -> Vec<TimelineEvent> {
+        (0..n)
+            .map(|_| TimelineEvent::new("dev".into(), EventType::SystemSample))
+            .collect()
+    }
+
+    #[test]
+    fn spool_round_trips_events() {
+        let dir = std::env::temp_dir().join(format!("arcnode-spool-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("spool.jsonl");
+        let spool = Spool::new(path.clone());
+
+        assert!(spool.load().is_empty());
+
+        let events = sample(3);
+        spool.replace(&events);
+        let loaded = spool.load();
+        assert_eq!(loaded.len(), 3);
+        // event_id must survive the round-trip so the gateway can deduplicate.
+        assert_eq!(loaded[0].event_id, events[0].event_id);
+
+        spool.clear();
+        assert!(spool.load().is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn spool_caps_at_max_events() {
+        let dir = std::env::temp_dir().join(format!("arcnode-spool-cap-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("spool.jsonl");
+        let spool = Spool::new(path.clone());
+
+        let events = sample(SPOOL_MAX_EVENTS + 10);
+        spool.replace(&events);
+        assert_eq!(spool.load().len(), SPOOL_MAX_EVENTS);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

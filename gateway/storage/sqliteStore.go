@@ -49,8 +49,10 @@ func (s *Store) migrate() error {
 		)`,
 		`CREATE TABLE IF NOT EXISTS events (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			event_id TEXT,
 			device_id TEXT NOT NULL,
 			timestamp INTEGER NOT NULL,
+			received_at INTEGER,
 			event_type TEXT NOT NULL,
 			category TEXT,
 			process_name TEXT,
@@ -87,8 +89,18 @@ func (s *Store) migrate() error {
 			return fmt.Errorf("migrate: %w", err)
 		}
 	}
-	// Best-effort column add for older databases. Ignore the "duplicate column name"
-	// error returned when the column already exists.
+	// Best-effort column adds for older databases. Ignore the "duplicate column
+	// name" error returned when the column already exists.
 	_, _ = s.DB.Exec(`ALTER TABLE custom_keywords ADD COLUMN scope TEXT NOT NULL DEFAULT 'process'`)
+	_, _ = s.DB.Exec(`ALTER TABLE events ADD COLUMN event_id TEXT`)
+	_, _ = s.DB.Exec(`ALTER TABLE events ADD COLUMN received_at INTEGER`)
+	// Idempotency: a partial unique index on event_id deduplicates re-sent
+	// events while leaving legacy rows (NULL event_id) untouched. Created after
+	// the ALTER so the column exists on upgraded databases.
+	if _, err := s.DB.Exec(
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_events_event_id ON events(event_id) WHERE event_id IS NOT NULL`,
+	); err != nil {
+		return fmt.Errorf("migrate event_id index: %w", err)
+	}
 	return nil
 }
