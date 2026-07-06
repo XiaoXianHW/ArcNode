@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use core::{export_to_json, Config, Storage};
+use core::{export_to_json, Config, Storage, StorageConfig};
 
 #[derive(Parser)]
 #[command(name = "ArcLM Node Agent")]
@@ -105,6 +105,20 @@ fn main() -> Result<()> {
                     config.modules.system_interval_secs,
                 )?;
                 started_modules.push("system");
+            }
+
+            if config.achievements.enabled {
+                if let StorageConfig::Remote { gateway_url, token, .. } = &config.storage {
+                    achievement_dlc::start(
+                        gateway_url.clone(),
+                        token.clone(),
+                        config.achievements.clone(),
+                        running.clone(),
+                    )?;
+                    started_modules.push("achievements");
+                } else {
+                    info!("achievements DLC requires remote storage, skipping");
+                }
             }
 
             if started_modules.is_empty() {

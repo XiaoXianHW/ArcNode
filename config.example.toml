@@ -40,3 +40,13 @@ data_dir = "data"
 # token = "your-gateway-token-here"
 # batch_size = 50
 # flush_interval_secs = 3
+
+# 成就呈现 DLC（可选，仅 remote 存储时生效）
+# 解锁新成就时在本机进行提示
+[achievements]
+# 是否启用
+enabled = false
+# 轮询间隔（秒）
+poll_interval_secs = 30
+# 呈现方式: "notification"(系统通知) / "popup"(类 Steam 弹窗) / "console"(仅日志)
+presentation = "notification"
