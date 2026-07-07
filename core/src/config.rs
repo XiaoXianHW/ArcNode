@@ -8,6 +8,8 @@ pub struct Config {
     pub storage: StorageConfig,
     pub idle: IdleConfig,
     pub modules: ModulesConfig,
+    #[serde(default)]
+    pub achievements: AchievementsConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,6 +38,33 @@ pub struct ModulesConfig {
 
 fn default_system_on() -> bool { true }
 fn default_system_interval() -> u64 { 60 }
+
+/// Achievement presentation DLC: when enabled (remote storage only), the agent
+/// polls the gateway for newly unlocked achievements and presents them.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AchievementsConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_ach_poll")]
+    pub poll_interval_secs: u64,
+    /// "popup" (Steam-style toast window), "notification" (OS notification)
+    /// or "console" (log line only).
+    #[serde(default = "default_ach_presentation")]
+    pub presentation: String,
+}
+
+fn default_ach_poll() -> u64 { 30 }
+fn default_ach_presentation() -> String { "notification".to_string() }
+
+impl Default for AchievementsConfig {
+    fn default() -> Self {
+        AchievementsConfig {
+            enabled: false,
+            poll_interval_secs: default_ach_poll(),
+            presentation: default_ach_presentation(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -77,6 +106,7 @@ impl Default for Config {
                 system: true,
                 system_interval_secs: 60,
             },
+            achievements: AchievementsConfig::default(),
         }
     }
 }

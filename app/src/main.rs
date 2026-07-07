@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use core::{export_to_json, Config, Storage};
+use core::{export_to_json, Config, Storage, StorageConfig};
 
 #[derive(Parser)]
 #[command(name = "ArcLM Node Agent")]
@@ -27,6 +27,13 @@ enum Commands {
     },
     
     InitConfig,
+
+    /// 查看成就解锁历史（需要 remote 存储模式）
+    Unlocks {
+        /// 最多显示条数
+        #[arg(short, long, default_value_t = 20)]
+        limit: usize,
+    },
 }
 
 fn main() -> Result<()> {
@@ -55,6 +62,27 @@ fn main() -> Result<()> {
             let content = toml::to_string_pretty(&config)?;
             std::fs::write("config.toml", content)?;
             info!("Config file created: config.toml");
+            Ok(())
+        }
+        Some(Commands::Unlocks { limit }) => {
+            let config = Config::load_or_create("config.toml")?;
+            let StorageConfig::Remote { gateway_url, token, .. } = &config.storage else {
+                anyhow::bail!("unlock history requires remote storage mode");
+            };
+            let unlocks = achievement_dlc::fetch_history(gateway_url, token)?;
+            if unlocks.is_empty() {
+                println!("No achievements unlocked yet.");
+                return Ok(());
+            }
+            for u in unlocks.iter().take(*limit) {
+                let when = chrono::DateTime::from_timestamp(u.unlocked_at, 0)
+                    .map(|t| t.with_timezone(&Local).format("%Y-%m-%d %H:%M").to_string())
+                    .unwrap_or_else(|| u.unlocked_at.to_string());
+                println!(
+                    "{}  [{:<8}] {:<24} +{} pts  {}",
+                    when, u.tier, u.name, u.points, u.description
+                );
+            }
             Ok(())
         }
         None => {
@@ -105,6 +133,20 @@ fn main() -> Result<()> {
                     config.modules.system_interval_secs,
                 )?;
                 started_modules.push("system");
+            }
+
+            if config.achievements.enabled {
+                if let StorageConfig::Remote { gateway_url, token, .. } = &config.storage {
+                    achievement_dlc::start(
+                        gateway_url.clone(),
+                        token.clone(),
+                        config.achievements.clone(),
+                        running.clone(),
+                    )?;
+                    started_modules.push("achievements");
+                } else {
+                    info!("achievements DLC requires remote storage, skipping");
+                }
             }
 
             if started_modules.is_empty() {

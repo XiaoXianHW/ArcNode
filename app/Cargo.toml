@@ -14,6 +14,7 @@ watcher-idle = { path = "../watcher-idle" }
 watcher-process = { path = "../watcher-process" }
 watcher-shortcut = { path = "../watcher-shortcut" }
 watcher-system = { path = "../watcher-system" }
+achievement-dlc = { path = "../achievement-dlc" }
 
 anyhow = { workspace = true }
 log = { workspace = true }
