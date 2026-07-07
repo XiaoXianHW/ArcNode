@@ -11,22 +11,36 @@ use crate::Unlock;
 const W: usize = 400;
 const H: usize = 104;
 const BG: u32 = 0xFF1B1E26;
-const ACCENT: u32 = 0xFFD9A441; // gold bar + heading
+const ACCENT: u32 = 0xFFD9A441; // default gold bar + heading
 const FG: u32 = 0xFFF2F3F5;
 const MUTED: u32 = 0xFF9AA3B2;
 const SHOW_FOR: Duration = Duration::from_millis(4500);
+const MARGIN_X: i32 = 24;
+const MARGIN_Y: i32 = 64; // leaves room for a taskbar/dock
+
+/// Accent color per achievement tier (matches the web achievement wall).
+fn tier_accent(tier: &str) -> u32 {
+    match tier.to_ascii_lowercase().as_str() {
+        "bronze" => 0xFFB87333,
+        "silver" => 0xFFC0C4CC,
+        "gold" => 0xFFD9A441,
+        "platinum" => 0xFF67D8E0,
+        _ => ACCENT,
+    }
+}
 
 pub fn show(u: &Unlock) -> Result<()> {
     let font = load_font()?;
+    let accent = tier_accent(&u.tier);
     let mut buf = vec![BG; W * H];
 
-    // gold accent bar on the left
+    // tier-colored accent bar on the left
     for y in 0..H {
         for x in 0..4 {
-            buf[y * W + x] = ACCENT;
+            buf[y * W + x] = accent;
         }
     }
-    draw_text(&mut buf, &font, "ACHIEVEMENT UNLOCKED", 20.0, 14.0, 13.0, ACCENT);
+    draw_text(&mut buf, &font, "ACHIEVEMENT UNLOCKED", 20.0, 14.0, 13.0, accent);
     draw_text(&mut buf, &font, &u.name, 20.0, 36.0, 22.0, FG);
     let mut desc = u.description.clone();
     if u.points > 0 {
@@ -46,7 +60,14 @@ pub fn show(u: &Unlock) -> Result<()> {
         },
     )
     .context("open popup window")?;
-    win.set_position(60, 60);
+    let (px, py) = match screen_size() {
+        Some((sw, sh)) => (
+            (sw as i32 - W as i32 - MARGIN_X).max(0),
+            (sh as i32 - H as i32 - MARGIN_Y).max(0),
+        ),
+        None => (60, 60),
+    };
+    win.set_position(px as isize, py as isize);
 
     let start = Instant::now();
     while win.is_open() && start.elapsed() < SHOW_FOR {
@@ -54,6 +75,47 @@ pub fn show(u: &Unlock) -> Result<()> {
         std::thread::sleep(Duration::from_millis(33));
     }
     Ok(())
+}
+
+/// Primary display size in pixels, used to anchor the toast bottom-right.
+#[cfg(target_os = "windows")]
+fn screen_size() -> Option<(usize, usize)> {
+    use windows::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN};
+    let w = unsafe { GetSystemMetrics(SM_CXSCREEN) };
+    let h = unsafe { GetSystemMetrics(SM_CYSCREEN) };
+    (w > 0 && h > 0).then_some((w as usize, h as usize))
+}
+
+#[cfg(target_os = "macos")]
+fn screen_size() -> Option<(usize, usize)> {
+    let out = std::process::Command::new("osascript")
+        .args(["-e", "tell application \"Finder\" to get bounds of window of desktop"])
+        .output()
+        .ok()?;
+    let s = String::from_utf8_lossy(&out.stdout);
+    let parts: Vec<i64> = s
+        .trim()
+        .split(',')
+        .filter_map(|p| p.trim().parse().ok())
+        .collect();
+    match parts.as_slice() {
+        [_, _, w, h] if *w > 0 && *h > 0 => Some((*w as usize, *h as usize)),
+        _ => None,
+    }
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn screen_size() -> Option<(usize, usize)> {
+    // xrandr prints: "Screen 0: ..., current 1920 x 1080, maximum ..."
+    let out = std::process::Command::new("xrandr").arg("--current").output().ok()?;
+    let s = String::from_utf8_lossy(&out.stdout);
+    let rest = &s[s.find("current ")? + "current ".len()..];
+    let dims = rest.split(',').next()?;
+    let mut it = dims.split('x').filter_map(|p| p.trim().parse::<usize>().ok());
+    match (it.next(), it.next()) {
+        (Some(w), Some(h)) if w > 0 && h > 0 => Some((w, h)),
+        _ => None,
+    }
 }
 
 fn truncate(s: &str, max_chars: usize) -> String {

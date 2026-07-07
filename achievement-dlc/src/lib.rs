@@ -81,6 +81,16 @@ fn now_unix() -> i64 {
         .unwrap_or(0)
 }
 
+/// Fetches the full unlock history for this tenant (most recent first).
+pub fn fetch_history(gateway_url: &str, token: &str) -> Result<Vec<Unlock>> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()?;
+    let mut unlocks = poll(&client, gateway_url, token, 0)?;
+    unlocks.sort_by_key(|u| std::cmp::Reverse(u.unlocked_at));
+    Ok(unlocks)
+}
+
 fn poll(
     client: &reqwest::blocking::Client,
     gateway_url: &str,

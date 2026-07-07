@@ -13,3 +13,6 @@ reqwest = { workspace = true }
 notify-rust = "4"
 minifb = "0.27"
 fontdue = "0.9"
+
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true }
